@@ -1039,6 +1039,14 @@ TEST_F(TestBinaryBuilder, TestHugeStringAppendFails) {
   ASSERT_RAISES(Invalid, builder_->Append(huge_string));
 }
 
+TEST_F(TestBinaryBuilder, TestHugeStringAppendFailsOnLargeOffset) {
+  const int32_t upper_bound = std::numeric_limits<int32_t>::max();
+  std::string huge_string(upper_bound, 'a');
+  std::string tiny_string("a");
+  ASSERT_OK(builder_->Append(huge_string));
+  ASSERT_RAISES(Invalid, builder_->Append(tiny_string));
+}
+
 // ----------------------------------------------------------------------
 // Slice tests
 

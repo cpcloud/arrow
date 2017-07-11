@@ -185,9 +185,7 @@ static Status AppendObjectStrings(
 
       const Py_ssize_t python_length = PyBytes_GET_SIZE(obj);
       if (python_length > std::numeric_limits<int32_t>::max()) {
-        return Status::Invalid(
-            "Byte string is too large to be represented. Use chunked "
-            "RecordBatches to build string arrays less than 2GB long");
+        return Status::Invalid("Byte string must be less than 2GB in size");
       }
 
       const int32_t length = static_cast<int32_t>(python_length);
