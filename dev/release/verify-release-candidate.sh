@@ -1,4 +1,4 @@
-#!/bin/bash
+#!/bin/bash -ex
 #
 # Licensed to the Apache Software Foundation (ASF) under one
 # or more contributor license agreements.  See the NOTICE file
@@ -39,8 +39,6 @@ case $# in
      ;;
 esac
 
-set -ex
-
 HERE=$(cd `dirname "${BASH_SOURCE[0]:-$0}"` && pwd)
 
 ARROW_DIST_URL='https://dist.apache.org/repos/dist/dev/arrow'
@@ -70,10 +68,10 @@ fetch_archive() {
 }
 
 setup_tempdir() {
-  cleanup() {
-    rm -fr "$TMPDIR"
-  }
-  trap cleanup EXIT
+  #cleanup() {
+    #rm -fr "$TMPDIR"
+  #}
+  #trap cleanup EXIT
   TMPDIR=$(mktemp -d -t "$1.XXXXX")
 }
 
@@ -82,17 +80,17 @@ setup_miniconda() {
   # Setup short-lived miniconda for Python and integration tests
   MINICONDA_URL=https://repo.continuum.io/miniconda/Miniconda3-latest-Linux-x86_64.sh
 
-  MINICONDA=`pwd`/test-miniconda
-
   wget -O miniconda.sh $MINICONDA_URL
   bash miniconda.sh -b -p $MINICONDA
   rm -f miniconda.sh
 
   export PATH=$MINICONDA/bin:$PATH
 
-  conda create -n arrow-test -y -q python=3.6 \
-        nomkl numpy pandas six cython
-  source activate arrow-test
+  conda create -n $ENV_NAME -y -c conda-forge python=3.6 \
+        nomkl numpy pandas six cython pytest \
+	nodejs lz4-c cmake brotli flatbuffers rapidjson \
+        thrift-cpp snappy jemalloc zstd 'boost-cpp<=1.64' || exit 1
+  source activate $ENV_NAME
 }
 
 # Build and test C++
@@ -102,29 +100,36 @@ test_and_install_cpp() {
   pushd cpp/build
 
   cmake -DCMAKE_INSTALL_PREFIX=$ARROW_HOME \
+        -DCMAKE_INSTALL_LIBDIR=$ARROW_HOME/lib \
         -DARROW_PLASMA=on \
         -DARROW_PYTHON=on \
         -DARROW_BOOST_USE_SHARED=on \
         -DCMAKE_BUILD_TYPE=release \
         -DARROW_BUILD_BENCHMARKS=on \
-        ..
+        -DCMAKE_C_COMPILER=$CC \
+        -DCMAKE_CXX_COMPILER=$CXX \
+        -DPYTHON_EXECUTABLE=$CONDA_ENV/bin/python \
+        .. || exit 1
 
-  make -j$NPROC
-  make install
+  make -j$NPROC || exit 1
+  make install || exit 1
 
-  ctest -L unittest
+  LD_LIBRARY_PATH=$CONDA_ENV/lib ctest -L unittest || exit 1
   popd
 }
 
 # Build and install Parquet master so we can test the Python bindings
 
 install_parquet_cpp() {
-  git clone git@github.com:apache/parquet-cpp.git
+  git clone git://github.com/apache/parquet-cpp.git
 
   mkdir parquet-cpp/build
   pushd parquet-cpp/build
 
   cmake -DCMAKE_INSTALL_PREFIX=$PARQUET_HOME \
+        -DCMAKE_INSTALL_LIBDIR=$PARQUET_HOME/lib \
+        -DCMAKE_C_COMPILER=$CC \
+        -DCMAKE_CXX_COMPILER=$CXX \
         -DCMAKE_BUILD_TYPE=release \
         -DPARQUET_BOOST_USE_SHARED=on \
         -DPARQUET_BUILD_TESTS=off \
@@ -140,11 +145,13 @@ install_parquet_cpp() {
 
 test_python() {
   pushd python
+  which python
 
   pip install -r requirements.txt
 
-  python setup.py build_ext --inplace --with-parquet --with-plasma
-  py.test pyarrow -v --pdb
+  python setup.py build_ext --inplace \
+    --with-parquet --with-plasma --build-type=release
+  pytest pyarrow -v --pdb
 
   popd
 }
@@ -211,12 +218,25 @@ test_integration() {
 
 setup_tempdir "arrow-$VERSION"
 echo "Working in sandbox $TMPDIR"
-cd $TMPDIR
+pushd $TMPDIR
 
-export ARROW_HOME=$TMPDIR/install
-export PARQUET_HOME=$TMPDIR/install
-export LD_LIBRARY_PATH=$ARROW_HOME/lib:$LD_LIBRARY_PATH
-export PKG_CONFIG_PATH=$ARROW_HOME/lib/pkgconfig:$PKG_CONFIG_PATH
+export CC=$(which gcc)
+export CXX=$(which g++)
+export MINICONDA=$TMPDIR/test-miniconda
+export ENV_NAME=arrow-test
+export CONDA_ENV=$MINICONDA/envs/$ENV_NAME
+export BOOST_ROOT=$CONDA_ENV
+export FLATBUFFERS_HOME=$CONDA_ENV
+export JEMALLOC_HOME=$CONDA_ENV
+export BROTLI_HOME=$CONDA_ENV
+export LZ4_HOME=$CONDA_ENV
+export SNAPPY_HOME=$CONDA_ENV
+export ZLIB_HOME=$CONDA_ENV
+export ZSTD_HOME=$CONDA_ENV
+export RAPIDJSON_HOME=$CONDA_ENV
+
+export ARROW_HOME=$CONDA_ENV
+export PARQUET_HOME=$CONDA_ENV
 
 NPROC=$(nproc)
 VERSION=$1
