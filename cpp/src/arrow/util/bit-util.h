@@ -34,6 +34,8 @@
 #define ARROW_BYTE_SWAP32 __builtin_bswap32
 #endif
 
+#include <climits>
+#include <limits>
 #include <cstdint>
 #include <limits>
 #include <memory>
@@ -41,6 +43,7 @@
 
 #include "arrow/util/macros.h"
 #include "arrow/util/visibility.h"
+#include "arrow/util/logging.h"
 
 #ifdef ARROW_USE_SSE
 #include "arrow/util/cpu-info.h"
@@ -244,6 +247,56 @@ static inline int64_t RoundUpToMultipleOf64(int64_t num) {
 static inline int64_t RoundUpToMultipleOf8(int64_t num) {
   return RoundToPowerOfTwo<8>(num);
 }
+
+static inline int64_t BytesLength(int64_t length) {
+  return static_cast<int64_t>(Ceil(length, CHAR_BIT));
+}
+
+static inline int64_t count_leading_zeros(
+    const uint8_t* bytes, int64_t start, int64_t stop) {
+
+  const int64_t array_length = stop - start;
+  DCHECK_GE(array_length, 1);
+
+  const int64_t start_byte = BytesLength(start);
+  const int64_t stop_byte = BytesLength(stop);
+  DCHECK_GE(stop_byte - start_byte, 1);
+
+  int64_t leading_zeros = __builtin_clz(bytes[start_byte]);
+
+  if (leading_zeros == 0) {
+    return 0;
+  }
+
+  for (int64_t byte_index = start_byte;
+       IsMultipleOf8(leading_zeros) && leading_zeros < array_length; ++byte_index) {
+    leading_zeros += __builtin_clz(bytes[byte_index]) + byte_index * CHAR_BIT;
+    ++byte_index;
+  }
+
+  return std::min(leading_zeros, array_length - 1);
+}
+
+class BitArrayIndexIterator {
+ public:
+  explicit BitArrayIndexIterator(
+      const uint8_t* bytes, int64_t array_length, bool has_nulls) :
+      bytes_(bytes),
+      array_length_(array_length),
+      current_index_(has_nulls ? 0 : count_leading_zeros(bytes, 0, array_length)) {}
+
+  BitArrayIndexIterator& operator++() {
+    const int64_t current_index = current_index_;
+    current_index_ = count_leading_zeros(
+        bytes_, current_index + 1, array_length_ - current_index);
+    return *this;
+  }
+
+ private:
+  const uint8_t* bytes_;
+  const int64_t array_length_;
+  int64_t current_index_;
+};
 
 /// Non hw accelerated pop count.
 /// TODO: we don't use this in any perf sensitive code paths currently.  There
