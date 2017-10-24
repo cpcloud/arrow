@@ -33,6 +33,7 @@
 #include "arrow/type.h"
 #include "arrow/type_traits.h"
 #include "arrow/util/bit-util.h"
+#include "arrow/util/decimal.h"
 #include "arrow/util/logging.h"
 #include "arrow/util/string.h"
 #include "arrow/visitor_inline.h"
@@ -448,11 +449,22 @@ class ArrayWriter {
   }
 
   void WriteDataValues(const FixedSizeBinaryArray& arr) {
-    int32_t width = arr.byte_width();
+    const int32_t width = arr.byte_width();
+
     for (int64_t i = 0; i < arr.length(); ++i) {
       const uint8_t* buf = arr.GetValue(i);
       std::string encoded = HexEncode(buf, width);
       writer_->String(encoded);
+    }
+  }
+
+  void WriteDataValues(const DecimalArray& arr) {
+    const auto& type = static_cast<const DecimalType&>(*arr.type());
+    const int32_t precision = type.precision();
+
+    for (int64_t i = 0; i < arr.length(); ++i) {
+      const Decimal128 value(arr.GetValue(i));
+      writer_->String(value.ToString(precision, 0));
     }
   }
 
@@ -1053,7 +1065,9 @@ class ArrayReader {
   }
 
   template <typename T>
-  typename std::enable_if<std::is_base_of<FixedSizeBinaryType, T>::value, Status>::type
+  typename std::enable_if<std::is_base_of<FixedSizeBinaryType, T>::value &&
+                              !std::is_base_of<DecimalType, T>::value,
+                          Status>::type
   Visit(const T& type) {
     typename TypeTraits<T>::BuilderType builder(type_, pool_);
 
@@ -1089,6 +1103,32 @@ class ArrayReader {
         RETURN_NOT_OK(ParseHexValue(hex_data + j * 2, &byte_buffer_data[j]));
       }
       RETURN_NOT_OK(builder.Append(byte_buffer_data));
+    }
+    return builder.Finish(&result_);
+  }
+
+  template <typename T>
+  typename std::enable_if<std::is_base_of<DecimalType, T>::value, Status>::type Visit(
+      const T& type) {
+    typename TypeTraits<T>::BuilderType builder(type_, pool_);
+
+    const auto& json_data = obj_->FindMember("DATA");
+    RETURN_NOT_ARRAY("DATA", json_data, *obj_);
+
+    const auto& json_data_arr = json_data->value.GetArray();
+
+    DCHECK_EQ(static_cast<int32_t>(json_data_arr.Size()), length_);
+
+    for (int i = 0; i < length_; ++i) {
+      if (!is_valid_[i]) {
+        RETURN_NOT_OK(builder.AppendNull());
+        continue;
+      }
+
+      const rj::Value& val = json_data_arr[i];
+      DCHECK(val.IsString()) << "JSON value is not a string";
+      const Decimal128 value(val.GetString());
+      RETURN_NOT_OK(builder.Append(value));
     }
     return builder.Finish(&result_);
   }

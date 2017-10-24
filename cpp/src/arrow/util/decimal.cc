@@ -55,19 +55,21 @@ std::array<uint8_t, 16> Decimal128::ToBytes() const {
   return out;
 }
 
-std::string Decimal128::ToString(int precision, int scale) const {
-  using std::size_t;
+Status Decimal128::ToString(int precision, int scale, std::string* out) const {
+  DCHECK_GE(precision, 0);
+  DCHECK_LE(precision, 38);
 
   const bool is_negative = *this < 0;
 
-  // Decimal values are sent to clients as strings so in the interest of
-  // speed the string will be created without the using stringstream with the
-  // whole/fractional_part().
-  size_t last_char_idx = precision + (scale > 0)  // Add a space for decimal place
-                         + (scale == precision)   // Add a space for leading 0
-                         + is_negative;           // Add a space for negative sign
+  // Decimal values are sent to clients as strings so in the interest of speed the string
+  // will be created without the using stringstream with the whole/fractional_part().
+  size_t last_char_idx =
+      precision + static_cast<size_t>(scale > 0)  // Add a space for decimal place
+      + static_cast<size_t>(scale == precision)   // Add a space for leading 0
+      + static_cast<size_t>(is_negative);         // Add a space for negative sign
 
-  std::string str(last_char_idx, '0');
+  out->resize(last_char_idx, '0');
+  std::string& str(*out);
 
   // Start filling in the values in reverse order by taking the last digit
   // of the value. Use a positive value and worry about the sign later. At this
@@ -104,12 +106,46 @@ std::string Decimal128::ToString(int precision, int scale) const {
     // For safety, enforce string length independent of remaining_value.
   } while (last_char_idx > first_digit_idx);
 
+  if (remaining_value != 0) {
+    return Status::Invalid(
+        "Decimal128 value too big to be represented with precision 38");
+  }
+
   if (is_negative) {
     str[0] = '-';
   }
 
-  return str;
+  return Status::OK();
 }
+
+std::string Decimal128::ToString(int precision, int scale) const {
+  std::string out;
+  Status s = ToString(precision, scale, &out);
+  DCHECK(s.ok()) << s.message();
+  return out;
+}
+
+static constexpr auto kInt64DecimalDigits =
+    static_cast<size_t>(std::numeric_limits<int64_t>::digits10);
+static constexpr int64_t kPowersOfTen[kInt64DecimalDigits + 1] = {1LL,
+                                                                  10LL,
+                                                                  100LL,
+                                                                  1000LL,
+                                                                  10000LL,
+                                                                  100000LL,
+                                                                  1000000LL,
+                                                                  10000000LL,
+                                                                  100000000LL,
+                                                                  1000000000LL,
+                                                                  10000000000LL,
+                                                                  100000000000LL,
+                                                                  1000000000000LL,
+                                                                  10000000000000LL,
+                                                                  100000000000000LL,
+                                                                  1000000000000000LL,
+                                                                  10000000000000000LL,
+                                                                  100000000000000000LL,
+                                                                  1000000000000000000LL};
 
 static void StringToInteger(const std::string& str, Decimal128* out) {
   using std::size_t;
@@ -122,13 +158,10 @@ static void StringToInteger(const std::string& str, Decimal128* out) {
 
   DCHECK_GT(length, 0) << "length of parsed decimal string should be greater than 0";
 
-  size_t posn = 0;
-
-  while (posn < length) {
-    const size_t group = std::min(static_cast<size_t>(18), length - posn);
-    const auto chunk = static_cast<int64_t>(std::stoll(str.substr(posn, group)));
-    const auto multiple =
-        static_cast<int64_t>(std::pow(10.0, static_cast<double>(group)));
+  for (size_t posn = 0; posn < length;) {
+    const size_t group = std::min(kInt64DecimalDigits, length - posn);
+    const int64_t chunk = std::stoll(str.substr(posn, group));
+    const int64_t multiple = kPowersOfTen[group];
 
     *out *= multiple;
     *out += chunk;
@@ -677,6 +710,11 @@ bool operator>=(const Decimal128& left, const Decimal128& right) {
 Decimal128 operator-(const Decimal128& operand) {
   Decimal128 result(operand.high_bits(), operand.low_bits());
   return result.Negate();
+}
+
+Decimal128 operator~(const Decimal128& operand) {
+  Decimal128 result(~operand.high_bits(), ~operand.low_bits());
+  return result;
 }
 
 Decimal128 operator+(const Decimal128& left, const Decimal128& right) {

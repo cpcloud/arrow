@@ -256,4 +256,38 @@ TEST(Decimal128TestFalse, ConstructibleFromBool) {
   ASSERT_EQ(0, value.low_bits());
 }
 
+TEST(Decimal128Test, Division) {
+  const std::string expected_string_value("-23923094039234029");
+  const Decimal128 value(expected_string_value);
+  const Decimal128 result(value / 3);
+  const Decimal128 expected_value("-7974364679744676");
+  ASSERT_EQ(expected_value, result);
+}
+
+TEST(Decimal128Test, PrintLargePositiveValue) {
+  const std::string string_value("99999999999999999999999999999999999999");
+  const Decimal128 value(string_value);
+  const std::string printed_value = value.ToString(38, 0);
+  ASSERT_EQ(string_value, printed_value);
+}
+
+TEST(Decimal128Test, PrintLargeNegativeValue) {
+  const std::string string_value("-99999999999999999999999999999999999999");
+  const Decimal128 value(string_value);
+  const std::string printed_value = value.ToString(38, 0);
+  ASSERT_EQ(string_value, printed_value);
+}
+
+TEST(Decimal128Test, FailOnMoreThan38DigitsRequired) {
+  const std::string string_value("100000000000000000000000000000000000000");
+  const Decimal128 value(string_value);
+  std::string out;
+  ASSERT_RAISES(Invalid, value.ToString(38, 0, &out));
+
+  const std::string string_value2("-" + string_value);
+  const Decimal128 value2(string_value);
+  std::string out2;
+  ASSERT_RAISES(Invalid, value2.ToString(38, 0, &out2));
+}
+
 }  // namespace arrow
