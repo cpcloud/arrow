@@ -20,6 +20,7 @@
 
 #include <array>
 #include <cstdint>
+#include <ostream>
 #include <string>
 #include <type_traits>
 
@@ -111,6 +112,7 @@ class ARROW_EXPORT Decimal128 {
 
   /// \brief Convert the Decimal128 value to a base 10 decimal string with the given
   /// precision and scale.
+  Status ToString(int precision, int scale, std::string* out) const;
   std::string ToString(int precision, int scale) const;
 
   /// \brief Convert a decimal string to an Decimal128 value, optionally including
@@ -131,6 +133,7 @@ ARROW_EXPORT bool operator>(const Decimal128& left, const Decimal128& right);
 ARROW_EXPORT bool operator>=(const Decimal128& left, const Decimal128& right);
 
 ARROW_EXPORT Decimal128 operator-(const Decimal128& operand);
+ARROW_EXPORT Decimal128 operator~(const Decimal128& operand);
 ARROW_EXPORT Decimal128 operator+(const Decimal128& left, const Decimal128& right);
 ARROW_EXPORT Decimal128 operator-(const Decimal128& left, const Decimal128& right);
 ARROW_EXPORT Decimal128 operator*(const Decimal128& left, const Decimal128& right);

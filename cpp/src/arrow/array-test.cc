@@ -263,6 +263,8 @@ class TestPrimitiveBuilder : public TestBuilder {
     ASSERT_TRUE(result->Equals(*expected));
   }
 
+  int64_t FlipValue(int64_t value) const { return ~value; }
+
  protected:
   std::shared_ptr<DataType> type_;
   std::unique_ptr<BuilderType> builder_;
@@ -322,6 +324,11 @@ void TestPrimitiveBuilder<PBoolean>::RandomData(int64_t N, double pct_null) {
 
   test::random_null_bytes(N, 0.5, draws_.data());
   test::random_null_bytes(N, pct_null, valid_bytes_.data());
+}
+
+template <>
+int64_t TestPrimitiveBuilder<PBoolean>::FlipValue(int64_t value) const {
+  return !value;
 }
 
 template <>
@@ -454,8 +461,8 @@ TYPED_TEST(TestPrimitiveBuilder, Equality) {
   const int64_t first_valid_idx = std::distance(valid_bytes.begin(), first_valid);
   // This should be true with a very high probability, but might introduce flakiness
   ASSERT_LT(first_valid_idx, size - 1);
-  draws[first_valid_idx] =
-      static_cast<T>(~*reinterpret_cast<int64_t*>(&draws[first_valid_idx]));
+  draws[first_valid_idx] = static_cast<T>(
+      this->FlipValue(*reinterpret_cast<int64_t*>(&draws[first_valid_idx])));
   ASSERT_OK(MakeArray(valid_bytes, draws, size, builder, &unequal_array));
 
   // test normal equality

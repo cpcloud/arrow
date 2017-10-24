@@ -18,12 +18,14 @@
 #ifndef ARROW_TEST_UTIL_H_
 #define ARROW_TEST_UTIL_H_
 
+#include <algorithm>
 #include <cstdint>
 #include <limits>
 #include <memory>
 #include <random>
 #include <sstream>
 #include <string>
+#include <tuple>
 #include <vector>
 
 #include <gtest/gtest.h>
@@ -38,8 +40,8 @@
 #include "arrow/type.h"
 #include "arrow/type_traits.h"
 #include "arrow/util/bit-util.h"
+#include "arrow/util/decimal.h"
 #include "arrow/util/logging.h"
-#include "arrow/util/random.h"
 
 #define ASSERT_RAISES(ENUM, expr) \
   do {                            \
@@ -47,7 +49,7 @@
     if (!s.Is##ENUM()) {          \
       FAIL() << s.ToString();     \
     }                             \
-  } while (0)
+  } while (false)
 
 #define ASSERT_OK(expr)         \
   do {                          \
@@ -55,7 +57,7 @@
     if (!s.ok()) {              \
       FAIL() << s.ToString();   \
     }                           \
-  } while (0)
+  } while (false)
 
 #define ASSERT_OK_NO_THROW(expr) ASSERT_NO_THROW(ASSERT_OK(expr))
 
@@ -63,15 +65,15 @@
   do {                          \
     ::arrow::Status s = (expr); \
     EXPECT_TRUE(s.ok());        \
-  } while (0)
+  } while (false)
 
 #define ABORT_NOT_OK(s)                  \
   do {                                   \
     ::arrow::Status _s = (s);            \
     if (ARROW_PREDICT_FALSE(!_s.ok())) { \
-      exit(-1);                          \
+      exit(EXIT_FAILURE);                \
     }                                    \
-  } while (0);
+  } while (false);
 
 namespace arrow {
 
@@ -81,15 +83,11 @@ namespace test {
 
 template <typename T>
 void randint(int64_t N, T lower, T upper, std::vector<T>* out) {
-  Random rng(random_seed());
-  uint64_t draw;
-  uint64_t span = upper - lower;
-  T val;
-  for (int64_t i = 0; i < N; ++i) {
-    draw = rng.Uniform64(span);
-    val = static_cast<T>(draw + lower);
-    out->push_back(val);
-  }
+  const int random_seed = 0;
+  std::mt19937 gen(random_seed);
+  std::uniform_int_distribution<T> d(lower, upper);
+  out->resize(N, static_cast<T>(0));
+  std::generate(out->begin(), out->end(), [&d, &gen] { return d(gen); });
 }
 
 template <typename T>
@@ -97,9 +95,8 @@ void random_real(int64_t n, uint32_t seed, T min_value, T max_value,
                  std::vector<T>* out) {
   std::mt19937 gen(seed);
   std::uniform_real_distribution<T> d(min_value, max_value);
-  for (int64_t i = 0; i < n; ++i) {
-    out->push_back(d(gen));
-  }
+  out->resize(n, static_cast<T>(0));
+  std::generate(out->begin(), out->end(), [&d, &gen] { return d(gen); });
 }
 
 template <typename T>
@@ -115,7 +112,8 @@ inline Status CopyBufferFromVector(const std::vector<T>& values, MemoryPool* poo
 
   auto buffer = std::make_shared<PoolBuffer>(pool);
   RETURN_NOT_OK(buffer->Resize(nbytes));
-  memcpy(buffer->mutable_data(), values.data(), nbytes);
+  auto immutable_data = reinterpret_cast<const uint8_t*>(values.data());
+  std::copy(immutable_data, immutable_data + nbytes, buffer->mutable_data());
 
   *result = buffer;
   return Status::OK();
@@ -131,9 +129,7 @@ static inline Status GetBitmapFromVector(const std::vector<T>& is_valid,
 
   uint8_t* bitmap = buffer->mutable_data();
   for (size_t i = 0; i < static_cast<size_t>(length); ++i) {
-    if (is_valid[i]) {
-      BitUtil::SetBit(bitmap, i);
-    }
+    BitUtil::SetBitTo(bitmap, i, is_valid[i]);
   }
 
   *result = buffer;
@@ -143,55 +139,161 @@ static inline Status GetBitmapFromVector(const std::vector<T>& is_valid,
 // Sets approximately pct_null of the first n bytes in null_bytes to zero
 // and the rest to non-zero (true) values.
 static inline void random_null_bytes(int64_t n, double pct_null, uint8_t* null_bytes) {
-  Random rng(random_seed());
-  for (int64_t i = 0; i < n; ++i) {
-    null_bytes[i] = rng.NextDoubleFraction() > pct_null;
-  }
+  const int random_seed = 0;
+  std::mt19937 gen(random_seed);
+  std::uniform_real_distribution<double> d(0.0, 1.0);
+  std::generate(null_bytes, null_bytes + n,
+                [&d, &gen, &pct_null] { return d(gen) > pct_null; });
 }
 
 static inline void random_is_valid(int64_t n, double pct_null,
                                    std::vector<bool>* is_valid) {
-  Random rng(random_seed());
-  for (int64_t i = 0; i < n; ++i) {
-    is_valid->push_back(rng.NextDoubleFraction() > pct_null);
-  }
+  const int random_seed = 0;
+  std::mt19937 gen(random_seed);
+  std::uniform_real_distribution<double> d(0.0, 1.0);
+  is_valid->resize(n, false);
+  std::generate(is_valid->begin(), is_valid->end(),
+                [&d, &gen, &pct_null] { return d(gen) > pct_null; });
 }
 
 static inline void random_bytes(int64_t n, uint32_t seed, uint8_t* out) {
   std::mt19937 gen(seed);
-  std::uniform_int_distribution<int> d(0, 255);
-
-  for (int64_t i = 0; i < n; ++i) {
-    out[i] = static_cast<uint8_t>(d(gen) & 0xFF);
-  }
+  std::uniform_int_distribution<int> d(0, std::numeric_limits<uint8_t>::max());
+  std::generate(out, out + n, [&d, &gen] { return static_cast<uint8_t>(d(gen) & 0xFF); });
 }
 
-static inline void random_ascii(int64_t n, uint32_t seed, uint8_t* out) {
+std::tuple<Decimal128, Decimal128> DecimalRange(int32_t precision) {
+  DCHECK_GE(precision, 1) << "decimal precision must be greater than or equal to 1, got "
+                          << precision;
+  DCHECK_LE(precision, 38) << "decimal precision must be less than or equal to 38, got "
+                           << precision;
+
+  Decimal128 max_decimal;
+
+  switch (precision) {
+    case 1:
+    case 2:
+      max_decimal = Decimal128(std::numeric_limits<int8_t>::max());
+      break;
+    case 3:
+    case 4:
+      max_decimal = Decimal128(std::numeric_limits<int16_t>::max());
+      break;
+    case 5:
+    case 6:
+      max_decimal = Decimal128(8338607);
+      break;
+    case 7:
+    case 8:
+    case 9:
+      max_decimal = Decimal128(std::numeric_limits<int32_t>::max());
+      break;
+    case 10:
+    case 11:
+      max_decimal = Decimal128(549755813887);
+      break;
+    case 12:
+    case 13:
+    case 14:
+      max_decimal = Decimal128(140737488355327);
+      break;
+    case 15:
+    case 16:
+      max_decimal = Decimal128(36028797018963967);
+      break;
+    case 17:
+    case 18:
+      max_decimal = Decimal128(std::numeric_limits<int64_t>::max());
+      break;
+    case 19:
+    case 20:
+    case 21:
+      max_decimal = Decimal128("2361183241434822606847");
+      break;
+    case 22:
+    case 23:
+      max_decimal = Decimal128("604462909807314587353087");
+      break;
+    case 24:
+    case 25:
+    case 26:
+      max_decimal = Decimal128("154742504910672534362390527");
+      break;
+    case 27:
+    case 28:
+      max_decimal = Decimal128("39614081257132168796771975167");
+      break;
+    case 29:
+    case 30:
+    case 31:
+      max_decimal = Decimal128("10141204801825835211973625643007");
+      break;
+    case 32:
+    case 33:
+      max_decimal = Decimal128("2596148429267413814265248164610047");
+      break;
+    case 34:
+    case 35:
+      max_decimal = Decimal128("664613997892457936451903530140172287");
+      break;
+    case 36:
+    case 37:
+    case 38:
+      // max_decimal = Decimal128("170141183460469231731687303715884105727");
+      max_decimal = Decimal128("99999999999999999999999999999999999999");
+      return std::make_tuple(-max_decimal, max_decimal);
+    default:
+      DCHECK(false);
+      break;
+  }
+
+  return std::make_tuple(~max_decimal, max_decimal);
+}
+
+static inline void random_decimals(int64_t n, uint32_t seed, int32_t precision,
+                                   uint8_t* out) {
+  Decimal128 max_decimal;
+  Decimal128 min_decimal;
+  std::tie(min_decimal, max_decimal) = DecimalRange(precision);
+
+  const auto min_low = static_cast<int64_t>(min_decimal.low_bits());
+  const auto max_low = static_cast<int64_t>(max_decimal.low_bits());
+
+  const int64_t min_high = min_decimal.high_bits();
+  const int64_t max_high = max_decimal.high_bits();
+
   std::mt19937 gen(seed);
-  std::uniform_int_distribution<int> d(65, 122);
 
-  for (int64_t i = 0; i < n; ++i) {
-    out[i] = static_cast<uint8_t>(d(gen) & 0xFF);
+  // The lower bits distribution is intentionally int64_t.
+  // If it were uint64_t then the size of the interval [min_high, max_high] would be 0
+  // because min_high > max_high due to 2's complement.
+  // So, we generate the same range of bits using int64_t and then cast to uint64_t.
+  std::uniform_int_distribution<int64_t> lower_dist(min_low, max_low);
+  std::uniform_int_distribution<int64_t> upper_dist(min_high, max_high);
+
+  for (int64_t i = 0; i < n; ++i, out += 16) {
+    reinterpret_cast<uint64_t*>(out)[0] =
+        BitUtil::ToLittleEndian(static_cast<uint64_t>(lower_dist(gen)));
+    reinterpret_cast<int64_t*>(out)[1] = BitUtil::ToLittleEndian(upper_dist(gen));
   }
 }
 
-template <typename T>
-void rand_uniform_int(int64_t n, uint32_t seed, T min_value, T max_value, T* out) {
+template <typename T, typename U = T>
+void rand_uniform_int(int64_t n, uint32_t seed, T min_value, T max_value, U* out) {
   DCHECK(out || (n == 0));
   std::mt19937 gen(seed);
   std::uniform_int_distribution<T> d(min_value, max_value);
-  for (int64_t i = 0; i < n; ++i) {
-    out[i] = static_cast<T>(d(gen));
-  }
+  std::generate(out, out + n, [&d, &gen] { return static_cast<U>(d(gen)); });
+}
+
+static inline void random_ascii(int64_t n, uint32_t seed, uint8_t* out) {
+  rand_uniform_int(n, seed, 'A', 'z', out);
 }
 
 static inline int64_t null_count(const std::vector<uint8_t>& valid_bytes) {
   int64_t result = 0;
-  for (size_t i = 0; i < valid_bytes.size(); ++i) {
-    if (valid_bytes[i] == 0) {
-      ++result;
-    }
-  }
+  std::for_each(valid_bytes.cbegin(), valid_bytes.cend(),
+                [&result](uint8_t byte) { result += byte == 0; });
   return result;
 }
 
