@@ -65,7 +65,7 @@ build_arrow() {
         -DARROW_NO_DEPRECATED_API=ON \
         -DARROW_PYTHON=ON \
         -DARROW_PLASMA=ON \
-        -DARROW_BOOST_USE_SHARED=off \
+        -DARROW_BOOST_USE_SHARED=ON \
         $ARROW_CPP_DIR
 
   ninja
@@ -87,10 +87,10 @@ build_parquet() {
       -GNinja \
       -DCMAKE_BUILD_TYPE=$BUILD_TYPE \
       -DCMAKE_INSTALL_PREFIX=$PARQUET_HOME \
-      -DPARQUET_BOOST_USE_SHARED=off \
-      -DPARQUET_BUILD_BENCHMARKS=off \
-      -DPARQUET_BUILD_EXECUTABLES=off \
-      -DPARQUET_BUILD_TESTS=off \
+      -DPARQUET_BOOST_USE_SHARED=ON \
+      -DPARQUET_BUILD_BENCHMARKS=OFF \
+      -DPARQUET_BUILD_EXECUTABLES=OFF \
+      -DPARQUET_BUILD_TESTS=OFF \
       ..
 
   ninja

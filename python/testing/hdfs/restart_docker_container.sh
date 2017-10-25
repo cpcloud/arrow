@@ -34,5 +34,5 @@ docker run -d -it --name $ARROW_TEST_NN_HOST \
        arrow-hdfs-test
 
 while ! docker exec $ARROW_TEST_NN_HOST impala-shell -q 'SELECT VERSION()'; do
-    sleep 1
+    sleep 15
 done

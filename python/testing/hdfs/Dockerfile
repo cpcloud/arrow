@@ -16,7 +16,7 @@
 # under the License.
 
 # TODO Replace this with a complete clean image build
-FROM cpcloud86/impala:metastore
+FROM cpcloud86/impala:java8-1
 
 USER root
 
