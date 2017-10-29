@@ -678,7 +678,7 @@ Status MakeDecimal(std::shared_ptr<RecordBatch>* out) {
   auto schema = ::arrow::schema({f0, f1});
 
   constexpr int kDecimalSize = 16;
-  constexpr int length = 2;
+  constexpr int length = 10;
 
   std::shared_ptr<Buffer> data, is_valid;
   std::vector<uint8_t> is_valid_bytes(length);
