@@ -313,6 +313,33 @@ static inline uint16_t ByteSwap(uint16_t value) {
   return static_cast<uint16_t>(ByteSwap(static_cast<int16_t>(value)));
 }
 
+#ifdef __SIZEOF_INT128__
+static constexpr auto kInt128Lower64Mask = static_cast<__int128>(UINT64_MAX);
+
+static constexpr auto kInt128UInt32Max = static_cast<__int128>(UINT32_MAX);
+static constexpr auto kInt128Lower32Mask = (kInt128UInt32Max << 64) | kInt128UInt32Max;
+
+static constexpr auto kInt128UInt16Max = static_cast<__int128>(UINT32_MAX);
+static constexpr auto kInt128Lower16Mask =
+    (((kInt128UInt16Max << 32) | kInt128UInt16Max) << 64) |
+    ((kInt128UInt16Max << 32) | kInt128UInt16Max);
+
+static constexpr auto kInt128UInt8Max = static_cast<__int128>(UINT8_MAX);
+static constexpr auto kInt128Lower8Mask =
+    (((((kInt128UInt8Max << 16) | kInt128UInt8Max) << 32) |
+      ((kInt128UInt8Max << 16) | kInt128UInt8Max))
+     << 64) |
+    ((((kInt128UInt8Max << 16) | kInt128UInt8Max) << 32) |
+     ((kInt128UInt8Max << 16) | kInt128UInt8Max));
+static inline __int128 ByteSwap(__int128 value) {
+  value = (value & kInt128Lower64Mask) << 64 | (value & ~kInt128Lower64Mask) >> 64;
+  value = (value & kInt128Lower32Mask) << 32 | (value & ~kInt128Lower32Mask) >> 32;
+  value = (value & kInt128Lower16Mask) << 16 | (value & ~kInt128Lower16Mask) >> 16;
+  value = (value & kInt128Lower8Mask) << 8 | (value & ~kInt128Lower8Mask) >> 8;
+  return value;
+}
+#endif
+
 /// Write the swapped bytes into dst. Src and st cannot overlap.
 static inline void ByteSwap(void* dst, const void* src, int len) {
   switch (len) {
@@ -342,23 +369,41 @@ static inline void ByteSwap(void* dst, const void* src, int len) {
 /// Converts to big endian format (if not already in big endian) from the
 /// machine's native endian format.
 #if ARROW_LITTLE_ENDIAN
+#ifdef __SIZEOF_INT128__
 template <typename T,
-          typename =
-              EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
-static inline T ToBigEndian(T value) {
-  return ByteSwap(value);
-}
-
-template <typename T,
-          typename =
-              EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
-static inline T ToLittleEndian(T value) {
-  return value;
-}
+          typename = EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t,
+                                     uint16_t, __int128>>
 #else
 template <typename T,
           typename =
               EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
+#endif
+static inline T ToBigEndian(T value) {
+  return ByteSwap(value);
+}
+
+#ifdef __SIZEOF_INT128__
+template <typename T,
+          typename = EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t,
+                                     uint16_t, __int128>>
+#else
+template <typename T,
+          typename =
+              EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
+#endif
+static inline T ToLittleEndian(T value) {
+  return value;
+}
+#else
+#ifdef __SIZEOF_INT128__
+template <typename T,
+          typename = EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t,
+                                     uint16_t, __int128>>
+#else
+template <typename T,
+          typename =
+              EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
+#endif
 static inline T ToBigEndian(T value) {
   return value;
 }
@@ -366,30 +411,54 @@ static inline T ToBigEndian(T value) {
 
 /// Converts from big endian format to the machine's native endian format.
 #if ARROW_LITTLE_ENDIAN
+#ifdef __SIZEOF_INT128__
 template <typename T,
-          typename =
-              EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
-static inline T FromBigEndian(T value) {
-  return ByteSwap(value);
-}
-
-template <typename T,
-          typename =
-              EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
-static inline T FromLittleEndian(T value) {
-  return value;
-}
+          typename = EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t,
+                                     uint16_t, __int128>>
 #else
 template <typename T,
           typename =
               EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
+#endif
+static inline T FromBigEndian(T value) {
+  return ByteSwap(value);
+}
+
+#ifdef __SIZEOF_INT128__
+template <typename T,
+          typename = EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t,
+                                     uint16_t, __int128>>
+#else
+template <typename T,
+          typename =
+              EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
+#endif
+static inline T FromLittleEndian(T value) {
+  return value;
+}
+#else
+#ifdef __SIZEOF_INT128__
+template <typename T,
+          typename = EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t,
+                                     uint16_t, __int128>>
+#else
+template <typename T,
+          typename =
+              EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
+#endif
 static inline T FromBigEndian(T value) {
   return value;
 }
 
+#ifdef __SIZEOF_INT128__
+template <typename T,
+          typename = EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t,
+                                     uint16_t, __int128>>
+#else
 template <typename T,
           typename =
               EnableIfIsOneOf<T, int64_t, uint64_t, int32_t, uint32_t, int16_t, uint16_t>>
+#endif
 static inline T FromLittleEndian(T value) {
   return ByteSwap(value);
 }

@@ -33,9 +33,6 @@
 
 namespace arrow {
 
-static constexpr uint64_t kIntMask = 0xFFFFFFFF;
-static constexpr auto kCarryBit = static_cast<uint64_t>(1) << static_cast<uint64_t>(32);
-
 Decimal128::Decimal128(const std::string& str) : Decimal128() {
   Status status(Decimal128::FromString(str, this));
   DCHECK(status.ok()) << status.message();
@@ -44,15 +41,6 @@ Decimal128::Decimal128(const std::string& str) : Decimal128() {
 Decimal128::Decimal128(const uint8_t* bytes)
     : Decimal128(BitUtil::FromLittleEndian(reinterpret_cast<const int64_t*>(bytes)[1]),
                  BitUtil::FromLittleEndian(reinterpret_cast<const uint64_t*>(bytes)[0])) {
-}
-
-std::array<uint8_t, 16> Decimal128::ToBytes() const {
-  const uint64_t raw[] = {BitUtil::ToLittleEndian(low_bits_),
-                          BitUtil::ToLittleEndian(static_cast<uint64_t>(high_bits_))};
-  const auto* raw_data = reinterpret_cast<const uint8_t*>(raw);
-  std::array<uint8_t, 16> out{{0}};
-  std::copy(raw_data, raw_data + out.size(), out.begin());
-  return out;
 }
 
 Status Decimal128::ToString(int precision, int scale, std::string* out) const {
@@ -290,134 +278,7 @@ Status Decimal128::FromString(const std::string& s, Decimal128* out, int* precis
   return Status::OK();
 }
 
-Decimal128& Decimal128::Negate() {
-  low_bits_ = ~low_bits_ + 1;
-  high_bits_ = ~high_bits_;
-  if (low_bits_ == 0) {
-    ++high_bits_;
-  }
-  return *this;
-}
-
-Decimal128& Decimal128::operator+=(const Decimal128& right) {
-  const uint64_t sum = low_bits_ + right.low_bits_;
-  high_bits_ += right.high_bits_;
-  if (sum < low_bits_) {
-    ++high_bits_;
-  }
-  low_bits_ = sum;
-  return *this;
-}
-
-Decimal128& Decimal128::operator-=(const Decimal128& right) {
-  const uint64_t diff = low_bits_ - right.low_bits_;
-  high_bits_ -= right.high_bits_;
-  if (diff > low_bits_) {
-    --high_bits_;
-  }
-  low_bits_ = diff;
-  return *this;
-}
-
-Decimal128& Decimal128::operator/=(const Decimal128& right) {
-  Decimal128 remainder;
-  DCHECK(Divide(right, this, &remainder).ok());
-  return *this;
-}
-
-Decimal128::operator char() const {
-  DCHECK(high_bits_ == 0 || high_bits_ == -1)
-      << "Trying to cast an Decimal128 greater than the value range of a "
-         "char. high_bits_ must be equal to 0 or -1, got: "
-      << high_bits_;
-  DCHECK_LE(low_bits_, std::numeric_limits<char>::max())
-      << "low_bits_ too large for C type char, got: " << low_bits_;
-  return static_cast<char>(low_bits_);
-}
-
-Decimal128& Decimal128::operator|=(const Decimal128& right) {
-  low_bits_ |= right.low_bits_;
-  high_bits_ |= right.high_bits_;
-  return *this;
-}
-
-Decimal128& Decimal128::operator&=(const Decimal128& right) {
-  low_bits_ &= right.low_bits_;
-  high_bits_ &= right.high_bits_;
-  return *this;
-}
-
-Decimal128& Decimal128::operator<<=(uint32_t bits) {
-  if (bits != 0) {
-    if (bits < 64) {
-      high_bits_ <<= bits;
-      high_bits_ |= (low_bits_ >> (64 - bits));
-      low_bits_ <<= bits;
-    } else if (bits < 128) {
-      high_bits_ = static_cast<int64_t>(low_bits_) << (bits - 64);
-      low_bits_ = 0;
-    } else {
-      high_bits_ = 0;
-      low_bits_ = 0;
-    }
-  }
-  return *this;
-}
-
-Decimal128& Decimal128::operator>>=(uint32_t bits) {
-  if (bits != 0) {
-    if (bits < 64) {
-      low_bits_ >>= bits;
-      low_bits_ |= static_cast<uint64_t>(high_bits_ << (64 - bits));
-      high_bits_ = static_cast<int64_t>(static_cast<uint64_t>(high_bits_) >> bits);
-    } else if (bits < 128) {
-      low_bits_ = static_cast<uint64_t>(high_bits_ >> (bits - 64));
-      high_bits_ = static_cast<int64_t>(high_bits_ >= 0L ? 0L : -1L);
-    } else {
-      high_bits_ = static_cast<int64_t>(high_bits_ >= 0L ? 0L : -1L);
-      low_bits_ = static_cast<uint64_t>(high_bits_);
-    }
-  }
-  return *this;
-}
-
-Decimal128& Decimal128::operator*=(const Decimal128& right) {
-  // Break the left and right numbers into 32 bit chunks
-  // so that we can multiply them without overflow.
-  const uint64_t L0 = static_cast<uint64_t>(high_bits_) >> 32;
-  const uint64_t L1 = static_cast<uint64_t>(high_bits_) & kIntMask;
-  const uint64_t L2 = low_bits_ >> 32;
-  const uint64_t L3 = low_bits_ & kIntMask;
-
-  const uint64_t R0 = static_cast<uint64_t>(right.high_bits_) >> 32;
-  const uint64_t R1 = static_cast<uint64_t>(right.high_bits_) & kIntMask;
-  const uint64_t R2 = right.low_bits_ >> 32;
-  const uint64_t R3 = right.low_bits_ & kIntMask;
-
-  uint64_t product = L3 * R3;
-  low_bits_ = product & kIntMask;
-
-  uint64_t sum = product >> 32;
-
-  product = L2 * R3;
-  sum += product;
-
-  product = L3 * R2;
-  sum += product;
-
-  low_bits_ += sum << 32;
-
-  high_bits_ = static_cast<int64_t>(sum < product ? kCarryBit : 0);
-  if (sum < product) {
-    high_bits_ += kCarryBit;
-  }
-
-  high_bits_ += static_cast<int64_t>(sum >> 32);
-  high_bits_ += L1 * R3 + L2 * R2 + L3 * R1;
-  high_bits_ += (L0 * R3 + L1 * R2 + L2 * R1 + L3 * R0) << 32;
-  return *this;
-}
-
+#ifndef __SIZEOF_INT128__
 /// Expands the given value into an array of ints so that we can work on
 /// it. The array will be converted to an absolute value and the wasNegative
 /// flag will be set appropriately. The array will remove leading zeros from
@@ -681,72 +542,41 @@ Status Decimal128::Divide(const Decimal128& divisor, Decimal128* result,
   FixDivisionSigns(result, remainder, dividend_was_negative, divisor_was_negative);
   return Status::OK();
 }
-
-bool operator==(const Decimal128& left, const Decimal128& right) {
-  return left.high_bits() == right.high_bits() && left.low_bits() == right.low_bits();
-}
-
-bool operator!=(const Decimal128& left, const Decimal128& right) {
-  return !operator==(left, right);
-}
-
-bool operator<(const Decimal128& left, const Decimal128& right) {
-  return left.high_bits() < right.high_bits() ||
-         (left.high_bits() == right.high_bits() && left.low_bits() < right.low_bits());
-}
-
-bool operator<=(const Decimal128& left, const Decimal128& right) {
-  return !operator>(left, right);
-}
-
-bool operator>(const Decimal128& left, const Decimal128& right) {
-  return operator<(right, left);
-}
-
-bool operator>=(const Decimal128& left, const Decimal128& right) {
-  return !operator<(left, right);
-}
+#endif
 
 Decimal128 operator-(const Decimal128& operand) {
-  Decimal128 result(operand.high_bits(), operand.low_bits());
+  Decimal128 result(operand);
   return result.Negate();
 }
 
-Decimal128 operator~(const Decimal128& operand) {
-  Decimal128 result(~operand.high_bits(), ~operand.low_bits());
-  return result;
-}
-
 Decimal128 operator+(const Decimal128& left, const Decimal128& right) {
-  Decimal128 result(left.high_bits(), left.low_bits());
+  Decimal128 result(left);
   result += right;
   return result;
 }
 
 Decimal128 operator-(const Decimal128& left, const Decimal128& right) {
-  Decimal128 result(left.high_bits(), left.low_bits());
+  Decimal128 result(left);
   result -= right;
   return result;
 }
 
 Decimal128 operator*(const Decimal128& left, const Decimal128& right) {
-  Decimal128 result(left.high_bits(), left.low_bits());
+  Decimal128 result(left);
   result *= right;
   return result;
 }
 
 Decimal128 operator/(const Decimal128& left, const Decimal128& right) {
-  Decimal128 remainder;
-  Decimal128 result;
-  DCHECK(left.Divide(right, &result, &remainder).ok());
+  Decimal128 result(left);
+  result /= right;
   return result;
 }
 
 Decimal128 operator%(const Decimal128& left, const Decimal128& right) {
-  Decimal128 remainder;
-  Decimal128 result;
-  DCHECK(left.Divide(right, &result, &remainder).ok());
-  return remainder;
+  Decimal128 result(left);
+  result %= right;
+  return result;
 }
 
 }  // namespace arrow

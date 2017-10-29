@@ -33,6 +33,8 @@ install(FILES
   compression_zstd.h
   cpu-info.h
   decimal.h
+  decimal_native.h
+  decimal_not_native.h
   hash-util.h
   key_value_metadata.h
   logging.h
