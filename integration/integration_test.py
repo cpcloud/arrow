@@ -354,7 +354,8 @@ class DecimalType(PrimitiveType):
                            ('typeBitWidth', self.bit_width)])])])
 
     def generate_column(self, size, name=None):
-        values = [random.randint(0, 2**self.bit_width - 1) for x in range(size)]
+        max_value = 99999999999999999999999999999999999999
+        values = [random.randint(-max_value, max_value) for _ in range(size)]
 
         is_valid = self._make_is_valid(size)
         if name is None:
@@ -365,13 +366,11 @@ class DecimalType(PrimitiveType):
 class DecimalColumn(PrimitiveColumn):
 
     def __init__(self, name, count, is_valid, values, bit_width):
-        PrimitiveColumn.__init__(self, name, count, is_valid, values)
+        super(DecimalColumn, self).__init__(name, count, is_valid, values)
         self.bit_width = bit_width
-        self.hex_width = bit_width / 4
 
     def _encode_value(self, x):
-        hex_format_str = '%%0%dx' % self.hex_width
-        return (hex_format_str % x).upper()
+        return str(x)
 
 
 class BooleanType(PrimitiveType):
