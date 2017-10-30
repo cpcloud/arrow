@@ -327,6 +327,12 @@ class FloatingPointType(PrimitiveType):
         return PrimitiveColumn(name, size, is_valid, values)
 
 
+def decimal_range_from_precision(precision):
+    assert 0 < precision <= 38
+    max_value = 10 ** precision - 1
+    return -max_value, max_value
+
+
 class DecimalType(PrimitiveType):
     def __init__(self, name, bit_width, precision, scale, nullable=True):
         super(DecimalType, self).__init__(name, nullable=True)
@@ -354,8 +360,8 @@ class DecimalType(PrimitiveType):
                            ('typeBitWidth', self.bit_width)])])])
 
     def generate_column(self, size, name=None):
-        max_value = 99999999999999999999999999999999999999
-        values = [random.randint(-max_value, max_value) for _ in range(size)]
+        min_value, max_value = decimal_range_from_precision(self.precision)
+        values = [random.randint(min_value, max_value) for _ in range(size)]
 
         is_valid = self._make_is_valid(size)
         if name is None:
@@ -752,8 +758,8 @@ def generate_primitive_case(batch_sizes):
 
 def generate_decimal_case():
     fields = [
-        DecimalType('f1', 128, 24, 10, True),
-        DecimalType('f2', 128, 32, -10, True)
+        DecimalType(name='f1', bit_width=128, precision=24, scale=10),
+        DecimalType(name='f2', bit_width=128, precision=32, scale=-10),
     ]
 
     batch_sizes = [7, 10]
