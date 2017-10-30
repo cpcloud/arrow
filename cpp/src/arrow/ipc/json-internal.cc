@@ -461,11 +461,10 @@ class ArrayWriter {
   void WriteDataValues(const DecimalArray& arr) {
     const auto& type = static_cast<const DecimalType&>(*arr.type());
     const int32_t precision = type.precision();
-    const int32_t scale = type.scale();
 
     for (int64_t i = 0; i < arr.length(); ++i) {
       const Decimal128 value(arr.GetValue(i));
-      writer_->String(value.ToString(precision, scale));
+      writer_->String(value.ToString(precision, 0));
     }
   }
 
