@@ -183,8 +183,9 @@ class PrimitiveColumn(Column):
         ]
 
 
-TEST_INT_MIN = - 2**31 + 1
-TEST_INT_MAX = 2**31 - 1
+TEST_INT_MAX = 2 ** 31 - 1
+TEST_INT_MIN = ~TEST_INT_MAX
+
 
 class IntegerType(PrimitiveType):
 
