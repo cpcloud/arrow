@@ -65,24 +65,16 @@ def rands(nchars):
     return ''.join(np.random.choice(RANDS_CHARS, nchars))
 
 
-if six.PY2:
-    def frombytes(o):
-        return o
+def tobytes(o):
+    if isinstance(o, six.text_type):
+        return o.encode('utf8')
+    return o
 
-    def tobytes(o):
-        if isinstance(o, unicode):
-            return o.encode('utf8')
-        else:
-            return o
-else:
-    def tobytes(o):
-        if isinstance(o, str):
-            return o.encode('utf8')
-        else:
-            return o
 
-    def frombytes(o):
+def frombytes(o):
+    if isinstance(o, six.binary_type):
         return o.decode('utf8')
+    return o
 
 
 # from the merge_arrow_pr.py script
