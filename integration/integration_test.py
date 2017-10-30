@@ -169,7 +169,7 @@ class PrimitiveType(DataType):
 class PrimitiveColumn(Column):
 
     def __init__(self, name, count, is_valid, values):
-        Column.__init__(self, name, count)
+        super(PrimitiveColumn, self).__init__(name, count)
         self.is_valid = is_valid
         self.values = values
 
@@ -191,7 +191,7 @@ class IntegerType(PrimitiveType):
     def __init__(self, name, is_signed, bit_width, nullable=True,
                  min_value=TEST_INT_MIN,
                  max_value=TEST_INT_MAX):
-        PrimitiveType.__init__(self, name, nullable=nullable)
+        super(IntegerType, self).__init__(name, nullable=nullable)
         self.is_signed = is_signed
         self.bit_width = bit_width
         self.min_value = min_value
@@ -231,9 +231,11 @@ class DateType(IntegerType):
     MILLISECOND = 1
 
     def __init__(self, name, unit, nullable=True):
-        self.unit = unit
         bit_width = 32 if unit == self.DAY else 64
-        IntegerType.__init__(self, name, True, bit_width, nullable=nullable)
+        super(DateType, self).__init__(
+            name, True, bit_width, nullable=nullable
+        )
+        self.unit = unit
 
     def _get_type(self):
         return OrderedDict([
@@ -260,9 +262,10 @@ class TimeType(IntegerType):
     }
 
     def __init__(self, name, unit='s', nullable=True):
+        super(TimeType, self).__init__(
+            name, True, self.BIT_WIDTHS[unit], nullable=nullable
+        )
         self.unit = unit
-        IntegerType.__init__(self, name, True, self.BIT_WIDTHS[unit],
-                             nullable=nullable)
 
     def _get_type(self):
         return OrderedDict([
@@ -275,9 +278,9 @@ class TimeType(IntegerType):
 class TimestampType(IntegerType):
 
     def __init__(self, name, unit='s', tz=None, nullable=True):
+        super(TimestampType, self).__init__(name, True, 64, nullable=nullable)
         self.unit = unit
         self.tz = tz
-        IntegerType.__init__(self, name, True, 64, nullable=nullable)
 
     def _get_type(self):
         fields = [
@@ -294,7 +297,7 @@ class TimestampType(IntegerType):
 class FloatingPointType(PrimitiveType):
 
     def __init__(self, name, bit_width, nullable=True):
-        PrimitiveType.__init__(self, name, nullable=nullable)
+        super(FloatingPointType, self).__init__(name, nullable=nullable)
 
         self.bit_width = bit_width
         self.precision = {
@@ -325,8 +328,7 @@ class FloatingPointType(PrimitiveType):
 
 class DecimalType(PrimitiveType):
     def __init__(self, name, bit_width, precision, scale, nullable=True):
-        PrimitiveType.__init__(self, name, nullable=True)
-
+        super(DecimalType, self).__init__(name, nullable=True)
         self.bit_width = bit_width
         self.precision = precision
         self.scale = scale
@@ -502,7 +504,7 @@ class StringColumn(BinaryColumn):
 class ListType(DataType):
 
     def __init__(self, name, value_type, nullable=True):
-        DataType.__init__(self, name, nullable=nullable)
+        super(ListType, self).__init__(name, nullable=nullable)
         self.value_type = value_type
 
     def _get_type(self):
@@ -545,7 +547,7 @@ class ListType(DataType):
 class ListColumn(Column):
 
     def __init__(self, name, count, is_valid, offsets, values):
-        Column.__init__(self, name, count)
+        super(ListColumn, self).__init__(name, count)
         self.is_valid = is_valid
         self.offsets = offsets
         self.values = values
@@ -563,7 +565,7 @@ class ListColumn(Column):
 class StructType(DataType):
 
     def __init__(self, name, field_types, nullable=True):
-        DataType.__init__(self, name, nullable=nullable)
+        super(StructType, self).__init__(name, nullable=nullable)
         self.field_types = field_types
 
     def _get_type(self):
@@ -612,7 +614,7 @@ class Dictionary(object):
 class DictionaryType(DataType):
 
     def __init__(self, name, index_type, dictionary, nullable=True):
-        DataType.__init__(self, name, nullable=nullable)
+        super(DictionaryType, self).__init__(name, nullable=nullable)
         assert isinstance(index_type, IntegerType)
         assert isinstance(dictionary, Dictionary)
 
@@ -647,7 +649,7 @@ class DictionaryType(DataType):
 class StructColumn(Column):
 
     def __init__(self, name, count, is_valid, field_values):
-        Column.__init__(self, name, count)
+        super(StructColumn, self).__init__(name, count)
         self.is_valid = is_valid
         self.field_values = field_values
 
@@ -859,8 +861,9 @@ class IntegrationRunner(object):
 
     def _compare_implementations(self, producer, consumer):
         print('##########################################################')
-        print('{0} producing, {1} consuming'.format(producer.name,
-                                                       consumer.name))
+        print(
+            '{0} producing, {1} consuming'.format(producer.name, consumer.name)
+        )
         print('##########################################################')
 
         for json_path in self.json_files:
@@ -1024,6 +1027,7 @@ def run_all_tests(debug=False):
     runner = IntegrationRunner(json_files, testers, debug=debug)
     runner.run()
     print('-- All tests passed!')
+
 
 if __name__ == '__main__':
     parser = argparse.ArgumentParser(description='Arrow integration test CLI')
