@@ -335,7 +335,8 @@ public class JsonFileReader implements AutoCloseable, DictionaryProvider {
         break;
       case DECIMAL: {
           DecimalVector decimalVector = (DecimalVector) valueVector;
-          BigDecimal decimalValue = new BigDecimal(parser.readValueAs(String.class));
+          BigInteger integerValue = new BigInteger(parser.readValueAs(String.class));
+          BigDecimal decimalValue = new BigDecimal(integerValue, 0);
           DecimalUtility.writeBigDecimalToArrowBuf(decimalValue, decimalVector.getBuffer(), i);
         }
         break;

@@ -245,7 +245,7 @@ public class JsonFileWriter implements AutoCloseable {
         break;
       case DECIMAL: {
           BigDecimal decimalValue = ((DecimalVector) valueVector).getAccessor().getObject(i);
-          String decimalString = decimalValue.toString();
+          String decimalString = decimalValue.unscaledValue().toString();
           generator.writeString(decimalString);
         }
         break;
