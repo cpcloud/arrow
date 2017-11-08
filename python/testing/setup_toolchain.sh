@@ -59,5 +59,5 @@ conda create -y -q -p $CPP_TOOLCHAIN python=3.6 \
     ninja
 
 if [ $BUILD_OS_NAME == "osx" ]; then
-  brew update && brew bundle --file=python/Brewfile
+  time brew update && time brew bundle --file=python/Brewfile
 fi
