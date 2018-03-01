@@ -696,7 +696,6 @@ std::shared_ptr<RecordBatch> MakeBatch(std::shared_ptr<Array> data) {
 Status SerializeObject(PyObject* context, PyObject* sequence, SerializedPyObject* out) {
   PyAcquireGIL lock;
   PyDateTime_IMPORT;
-  import_pyarrow();
   std::vector<PyObject*> sequences = {sequence};
   std::shared_ptr<Array> array;
   RETURN_NOT_OK(SerializeSequences(context, sequences, 0, &array, out));

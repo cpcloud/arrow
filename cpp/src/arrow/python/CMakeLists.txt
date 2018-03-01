@@ -50,6 +50,7 @@ set(ARROW_PYTHON_TEST_LINK_LIBS ${ARROW_PYTHON_MIN_TEST_LIBS})
 set(ARROW_PYTHON_SRCS
   arrow_to_pandas.cc
   arrow_to_python.cc
+  bind.cc
   benchmark.cc
   builtin_convert.cc
   common.cc
@@ -62,7 +63,10 @@ set(ARROW_PYTHON_SRCS
   numpy_to_arrow.cc
   python_to_arrow.cc
   pyarrow.cc
-)
+    )
+
+add_subdirectory(pybind11)
+include_directories(pybind11)
 
 if ("${COMPILER_FAMILY}" STREQUAL "clang")
   set_property(SOURCE pyarrow.cc
@@ -133,3 +137,6 @@ if (ARROW_BUILD_TESTS)
   target_link_libraries(python-test
     ${PYTHON_LIBRARIES})
 endif()
+
+pybind11_add_module(pyarrow2 bind.cc)
+target_link_libraries(pyarrow2 PRIVATE ${ARROW_PYTHON_SHARED_LINK_LIBS} arrow_python_shared ${PYTHON_LIBRARIES})

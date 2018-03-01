@@ -39,8 +39,6 @@ class Tensor;
 
 namespace py {
 
-ARROW_EXPORT int import_pyarrow();
-
 ARROW_EXPORT bool is_buffer(PyObject* buffer);
 ARROW_EXPORT Status unwrap_buffer(PyObject* buffer, std::shared_ptr<Buffer>* out);
 ARROW_EXPORT PyObject* wrap_buffer(const std::shared_ptr<Buffer>& buffer);

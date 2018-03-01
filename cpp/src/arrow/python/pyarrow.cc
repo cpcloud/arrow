@@ -17,155 +17,116 @@
 
 #include "arrow/python/pyarrow.h"
 
-#include <memory>
-
 #include "arrow/array.h"
+#include "arrow/builder.h"
 #include "arrow/table.h"
 #include "arrow/tensor.h"
 #include "arrow/type.h"
 
-namespace {
-#include "arrow/python/pyarrow_api.h"
-}
+#include "pybind11/include/pybind11/pybind11.h"
 
 namespace arrow {
 namespace py {
 
-int import_pyarrow() { return ::import_pyarrow__lib(); }
+template <typename T>
+PyObject* wrap(const std::shared_ptr<T>& obj) {
+  return pybind11::cast(obj).ptr();
+}
 
-bool is_buffer(PyObject* buffer) { return ::pyarrow_is_buffer(buffer) != 0; }
-
-Status unwrap_buffer(PyObject* buffer, std::shared_ptr<Buffer>* out) {
-  *out = ::pyarrow_unwrap_buffer(buffer);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap Buffer from the passed Python object.");
+template <typename T>
+Status unwrap(PyObject* obj, std::shared_ptr<T>* out) {
+  auto result = pybind11::reinterpret_borrow<pybind11::object>(obj);
+  try {
+    *out = result.cast<std::shared_ptr<T>>();
+  } catch (const std::exception& e) {
+    return Status::Invalid(e.what());
   }
+  return Status::OK();
 }
 
-PyObject* wrap_buffer(const std::shared_ptr<Buffer>& buffer) {
-  return ::pyarrow_wrap_buffer(buffer);
+template <typename T>
+bool is_arrow_type(PyObject* obj) {
+  auto result = pybind11::reinterpret_borrow<pybind11::object>(obj);
+  try {
+    result.cast<std::shared_ptr<T>>();
+  } catch (const pybind11::cast_error&) {
+    return false;
+  }
+  return true;
 }
 
-bool is_data_type(PyObject* data_type) { return ::pyarrow_is_data_type(data_type) != 0; }
+bool is_buffer(PyObject* buf) { return is_arrow_type<Buffer>(buf); }
+
+Status unwrap_buffer(PyObject* buf, std::shared_ptr<Buffer>* out) {
+  return unwrap(buf, out);
+}
+
+PyObject* wrap_buffer(const std::shared_ptr<Buffer>& buffer) { return wrap(buffer); }
+
+bool is_data_type(PyObject* obj) { return is_arrow_type<DataType>(obj); }
 
 Status unwrap_data_type(PyObject* object, std::shared_ptr<DataType>* out) {
-  *out = ::pyarrow_unwrap_data_type(object);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap DataType from the passed Python object.");
-  }
+  return unwrap(object, out);
 }
 
-PyObject* wrap_data_type(const std::shared_ptr<DataType>& type) {
-  return ::pyarrow_wrap_data_type(type);
-}
+PyObject* wrap_data_type(const std::shared_ptr<DataType>& type) { return wrap(type); }
 
-bool is_field(PyObject* field) { return ::pyarrow_is_field(field) != 0; }
+bool is_field(PyObject* field) { return is_arrow_type<Field>(field); }
 
 Status unwrap_field(PyObject* field, std::shared_ptr<Field>* out) {
-  *out = ::pyarrow_unwrap_field(field);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap Field from the passed Python object.");
-  }
+  return unwrap(field, out);
 }
 
-PyObject* wrap_field(const std::shared_ptr<Field>& field) {
-  return ::pyarrow_wrap_field(field);
-}
+PyObject* wrap_field(const std::shared_ptr<Field>& field) { return wrap(field); }
 
-bool is_schema(PyObject* schema) { return ::pyarrow_is_schema(schema) != 0; }
+bool is_schema(PyObject* schema) { return is_arrow_type<Schema>(schema); }
 
 Status unwrap_schema(PyObject* schema, std::shared_ptr<Schema>* out) {
-  *out = ::pyarrow_unwrap_schema(schema);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap Schema from the passed Python object.");
-  }
+  return unwrap(schema, out);
 }
 
-PyObject* wrap_schema(const std::shared_ptr<Schema>& schema) {
-  return ::pyarrow_wrap_schema(schema);
-}
+PyObject* wrap_schema(const std::shared_ptr<Schema>& schema) { return wrap(schema); }
 
-bool is_array(PyObject* array) { return ::pyarrow_is_array(array) != 0; }
+bool is_array(PyObject* array) { return is_arrow_type<Array>(array); }
 
 Status unwrap_array(PyObject* array, std::shared_ptr<Array>* out) {
-  *out = ::pyarrow_unwrap_array(array);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap Array from the passed Python object.");
-  }
+  return unwrap(array, out);
 }
 
-PyObject* wrap_array(const std::shared_ptr<Array>& array) {
-  return ::pyarrow_wrap_array(array);
-}
+PyObject* wrap_array(const std::shared_ptr<Array>& array) { return wrap(array); }
 
-bool is_tensor(PyObject* tensor) { return ::pyarrow_is_tensor(tensor) != 0; }
+bool is_tensor(PyObject* tensor) { return is_arrow_type<Tensor>(tensor); }
 
 Status unwrap_tensor(PyObject* tensor, std::shared_ptr<Tensor>* out) {
-  *out = ::pyarrow_unwrap_tensor(tensor);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap Tensor from the passed Python object.");
-  }
+  return unwrap(tensor, out);
 }
 
-PyObject* wrap_tensor(const std::shared_ptr<Tensor>& tensor) {
-  return ::pyarrow_wrap_tensor(tensor);
-}
+PyObject* wrap_tensor(const std::shared_ptr<Tensor>& tensor) { return wrap(tensor); }
 
-bool is_column(PyObject* column) { return ::pyarrow_is_column(column) != 0; }
+bool is_column(PyObject* column) { return is_arrow_type<Column>(column); }
 
 Status unwrap_column(PyObject* column, std::shared_ptr<Column>* out) {
-  *out = ::pyarrow_unwrap_column(column);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap Column from the passed Python object.");
-  }
+  return unwrap(column, out);
 }
 
-PyObject* wrap_column(const std::shared_ptr<Column>& column) {
-  return ::pyarrow_wrap_column(column);
-}
+PyObject* wrap_column(const std::shared_ptr<Column>& column) { return wrap(column); }
 
-bool is_table(PyObject* table) { return ::pyarrow_is_table(table) != 0; }
+bool is_table(PyObject* table) { return is_arrow_type<Table>(table); }
 
 Status unwrap_table(PyObject* table, std::shared_ptr<Table>* out) {
-  *out = ::pyarrow_unwrap_table(table);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap Table from the passed Python object.");
-  }
+  return unwrap(table, out);
 }
 
-PyObject* wrap_table(const std::shared_ptr<Table>& table) {
-  return ::pyarrow_wrap_table(table);
-}
+PyObject* wrap_table(const std::shared_ptr<Table>& table) { return wrap(table); }
 
-bool is_record_batch(PyObject* batch) { return ::pyarrow_is_batch(batch) != 0; }
+bool is_record_batch(PyObject* batch) { return is_arrow_type<RecordBatch>(batch); }
 
 Status unwrap_record_batch(PyObject* batch, std::shared_ptr<RecordBatch>* out) {
-  *out = ::pyarrow_unwrap_batch(batch);
-  if (*out) {
-    return Status::OK();
-  } else {
-    return Status::Invalid("Could not unwrap RecordBatch from the passed Python object.");
-  }
+  return unwrap(batch, out);
 }
 
 PyObject* wrap_record_batch(const std::shared_ptr<RecordBatch>& batch) {
-  return ::pyarrow_wrap_batch(batch);
+  return wrap(batch);
 }
 
 }  // namespace py
