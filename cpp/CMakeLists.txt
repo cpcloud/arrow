@@ -229,7 +229,9 @@ endif()
 
 check_ipo_supported(RESULT supported OUTPUT error)
 
-if(CMAKE_BUILD_TYPE MATCHES RELEASE)
+string(TOUPPER "${CMAKE_BUILD_TYPE}" UPPER_CMAKE_BUILD_TYPE)
+
+if(UPPER_CMAKE_BUILD_TYPE MATCHES RELEASE)
   if(ARROW_LTO AND supported)
     message(STATUS "Enabled IPO/LTO")
     set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
@@ -239,7 +241,7 @@ if(CMAKE_BUILD_TYPE MATCHES RELEASE)
     message(STATUS "IPO/LTO disabled")
   endif()
 else()
-  message(STATUS "IPO/LTO not enabled for DEBUG builds")
+  message(STATUS "IPO/LTO not enabled for ${UPPER_CMAKE_BUILD_TYPE} builds")
 endif()
 
 if(ARROW_BUILD_TESTS OR ARROW_BUILD_BENCHMARKS)
