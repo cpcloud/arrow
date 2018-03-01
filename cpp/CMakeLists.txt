@@ -15,7 +15,8 @@
 # specific language governing permissions and limitations
 # under the License.
 
-cmake_minimum_required(VERSION 3.2)
+cmake_minimum_required(VERSION 3.9.4)
+
 project(arrow)
 
 file(READ "${CMAKE_CURRENT_SOURCE_DIR}/../java/pom.xml" POM_XML)
@@ -26,6 +27,7 @@ string(REGEX REPLACE
 
 set(CMAKE_MODULE_PATH ${CMAKE_MODULE_PATH} "${CMAKE_SOURCE_DIR}/cmake_modules")
 
+include(CheckIPOSupported)
 include(CMakeParseArguments)
 include(ExternalProject)
 
@@ -203,6 +205,10 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
     "If off, output from ExternalProjects will be logged to files rather than shown"
     OFF)
 
+  option(ARROW_LTO
+    "If on, enable interprocedural/link-time optimization for all targets"
+    ON)
+
   if (MSVC)
     set(BROTLI_MSVC_STATIC_LIB_SUFFIX "-static" CACHE STRING
       "Brotli static lib suffix used on Windows with MSVC (default -static)")
@@ -219,6 +225,21 @@ if("${CMAKE_SOURCE_DIR}" STREQUAL "${CMAKE_CURRENT_SOURCE_DIR}")
       "Build Arrow with statically linked CRT"
       OFF)
   endif()
+endif()
+
+check_ipo_supported(RESULT supported OUTPUT error)
+
+if(CMAKE_BUILD_TYPE MATCHES RELEASE)
+  if(ARROW_LTO AND supported)
+    message(STATUS "Enabled IPO/LTO")
+    set(CMAKE_INTERPROCEDURAL_OPTIMIZATION TRUE)
+  elseif(NOT supported OR error)
+    message(STATUS "IPO/LTO not supported: <${error}>")
+  elseif(supported)
+    message(STATUS "IPO/LTO disabled")
+  endif()
+else()
+  message(STATUS "IPO/LTO not enabled for DEBUG builds")
 endif()
 
 if(ARROW_BUILD_TESTS OR ARROW_BUILD_BENCHMARKS)
