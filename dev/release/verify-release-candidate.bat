@@ -15,24 +15,7 @@
 @rem specific language governing permissions and limitations
 @rem under the License.
 
-@rem To use this script, first create the following conda environment. Change
-@rem the Python version if so desired. You can also omit one or more of the
-@rem libray build rem dependencies if you want to build them from source as well
-@rem
-
-@rem set PYTHON=3.6
-@rem conda create -n arrow-verify-release -f -q -y python=%PYTHON%
-@rem conda install -y ^
-@rem       six pytest setuptools numpy pandas cython ^
-@rem       thrift-cpp flatbuffers rapidjson ^
-@rem       cmake ^
-@rem       git ^
-@rem       boost-cpp ^
-@rem       snappy zlib brotli gflags lz4-c zstd -c conda-forge || exit /B
-
-@rem Then run from the directory containing the RC tarball
-@rem
-@rem verify-release-candidate.bat apache-arrow-%VERSION%
+@rem usage: verify-release-candidate.bat %VERSION% %RC_NUMBER%
 
 @echo on
 
@@ -40,12 +23,36 @@ if not exist "C:\tmp\" mkdir C:\tmp
 if exist "C:\tmp\arrow-verify-release" rd C:\tmp\arrow-verify-release /s /q
 if not exist "C:\tmp\arrow-verify-release" mkdir C:\tmp\arrow-verify-release
 
-tar xvf %1.tar.gz -C "C:/tmp/"
+set CONDA_ENV_NAME="arrow-verify-release"
 
-set GENERATOR=Visual Studio 14 2015 Win64
+@rem we do not exit if this command fails because the env might not exist
+conda env remove -y -q -n "%CONDA_ENV_NAME%" 1> nul 2>&1
+
+conda create -n "%CONDA_ENV_NAME%" -y -q -y -c conda-forge ^
+    python="%PYTHON%" ^
+    six pytest setuptools numpy pandas cython ^
+    thrift-cpp flatbuffers rapidjson ^
+    cmake ^
+    git ^
+    boost-cpp ^
+    snappy zlib brotli gflags lz4-c zstd || exit /B
+
+set VERSION="%1"
+set RC_NUMBER="%2"
+
+set ARROW_DIST_URL="https://dist.apache.org/repos/dist/dev/arrow"
+set ARROW_DIST_NAME="apache-arrow-%VERSION%"
+set ARROW_TARBALL="%ARROW_DIST_NAME%.tar.gz"
+set FULL_URL="%ARROW_DIST_URL%/apache-arrow-%VERSION%-rc%RC_NUMBER%/%ARROW_TARBALL%"
+
+curl --fail --location --silent --remote-name --show-error "%FULL_URL%" || exit /B
+
+tar xvf "%ARROW_TARBALL%" -C "C:/tmp" || exit /B
+
+set GENERATOR="Visual Studio 14 2015 Win64"
 set CONFIGURATION=release
-set ARROW_SOURCE=C:\tmp\%1
-set INSTALL_DIR=C:\tmp\%1\install
+set ARROW_SOURCE=C:\tmp\%ARROW_DIST_NAME%
+set INSTALL_DIR=%ARROW_SOURCE%\install
 
 pushd %ARROW_SOURCE%
 
@@ -64,7 +71,8 @@ pushd cpp\build
 
 cmake -G "%GENERATOR%" ^
       -DCMAKE_INSTALL_PREFIX=%ARROW_HOME% ^
-      -DARROW_BOOST_USE_SHARED=OFF ^
+      -DARROW_BOOST_USE_SHARED=ON ^
+      -DARROW_ORC=ON ^
       -DCMAKE_BUILD_TYPE=%CONFIGURATION% ^
       -DARROW_CXXFLAGS="/WX /MP" ^
       -DARROW_PYTHON=ON ^
@@ -78,15 +86,15 @@ ctest -VV  || exit /B
 popd
 
 @rem Build parquet-cpp
-git clone https://github.com/apache/parquet-cpp.git || exit /B
+git clone "https://github.com/apache/parquet-cpp.git" || exit /B
 mkdir parquet-cpp\build
 pushd parquet-cpp\build
 
 cmake -G "%GENERATOR%" ^
      -DCMAKE_INSTALL_PREFIX=%PARQUET_HOME% ^
      -DCMAKE_BUILD_TYPE=%CONFIGURATION% ^
-     -DPARQUET_BOOST_USE_SHARED=OFF ^
-     -DPARQUET_BUILD_TESTS=off .. || exit /B
+     -DPARQUET_BOOST_USE_SHARED=ON ^
+     -DPARQUET_BUILD_TESTS=OFF .. || exit /B
 cmake --build . --target INSTALL --config %CONFIGURATION% || exit /B
 popd
 
@@ -95,8 +103,8 @@ popd
 @rem see PARQUET-1018
 pushd python
 
-set PYARROW_CXXFLAGS=/WX
+set PYARROW_CXXFLAGS="/WX"
 python setup.py build_ext --inplace --with-parquet --bundle-arrow-cpp bdist_wheel  || exit /B
-py.test pyarrow -v -s --parquet || exit /B
+pytest pyarrow -v -s --parquet || exit /B
 
 popd
