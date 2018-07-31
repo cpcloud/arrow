@@ -1,3 +1,9 @@
+apache-arrow (0.10.0-1) unstable; urgency=low
+
+  * New upstream release.
+
+ -- Phillip Cloud <cpcloud@gmail.com>  Tue, 31 Jul 2018 00:07:27 -0000
+
 apache-arrow (0.9.0-1) unstable; urgency=low
 
   * New upstream release.
