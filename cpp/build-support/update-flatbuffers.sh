@@ -27,12 +27,8 @@ FLATC="flatc -c --cpp-std c++11"
 
 $FLATC -o $SOURCE_DIR/generated \
       --scoped-enums \
-      $FORMAT_DIR/Message.fbs \
-      $FORMAT_DIR/File.fbs \
-      $FORMAT_DIR/Schema.fbs \
-      $FORMAT_DIR/Tensor.fbs \
-      $FORMAT_DIR/SparseTensor.fbs \
-      src/arrow/ipc/feather.fbs
+      $FORMAT_DIR/*.fbs \
+      $SOURCE_DIR/arrow/ipc/feather.fbs
 
 $FLATC -o $SOURCE_DIR/plasma \
       --gen-object-api \

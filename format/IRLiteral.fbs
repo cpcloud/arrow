@@ -15,10 +15,48 @@
 // specific language governing permissions and limitations
 // under the License.
 
+include "Schema.fbs";
+include "IRFunction.fbs";
+
 namespace org.apache.arrow.ir.flatbuf;
 
-import "Schema.fbs";
-import "IRFunctionExpression.fbs";
+// no union literal is defined as only one branch of a union can be resolved.
+// no literals for large string/binary types as flatbuffer is limited to 2gb.
+
+union RexLiteralValue {
+  BooleanLiteral,
+
+  I8Literal,
+  I16Literal,
+  I32Literal,
+  I64Literal,
+
+  U8Literal,
+  U16Literal,
+  U32Literal,
+  U64Literal,
+
+  DateLiteral,
+  TimeLiteral,
+  TimestampLiteral,
+
+  DecimalLiteral,
+
+  HalfFloatLiteral,
+  FloatLiteral,
+  DoubleLiteral,
+
+  ArrayLiteral,
+  StructLiteral,
+  MapLiteral,
+
+  StringLiteral,
+  BinaryLiteral
+}
+
+table RexLiteral {
+  value: RexLiteralValue;
+}
 
 table ArrayLiteral {
   values: [RexLiteral];
@@ -34,7 +72,7 @@ table KeyValue {
 }
 
 table MapLiteral {
-  values: [KeyValue]; 
+  values: [KeyValue];
 }
 
 table I8Literal {
@@ -51,10 +89,6 @@ table I32Literal {
 
 table I64Literal {
   value: int64;
-}
-
-table U8Literal {
-  value: int8;
 }
 
 table U8Literal {
@@ -102,13 +136,13 @@ table DateLiteral {
 
 table TimeLiteral {
   // nanosecond time value.
-  value: int64; 
+  value: int64;
 }
 
-table Timestamp {
+table TimestampLiteral {
   //microsecond timestamp.
   value: int64;
-  
+
   // timezone value, same definition as used in Schema.fbs.
   timezone: string;
 }
@@ -120,18 +154,5 @@ table BinaryLiteral {
 table StringLiteral {
   value: string;
 }
-
-// no union literal is defined as only one branch of a union can be resolved.
-// no literals for large string/binary types as flatbuffer is limited to 2gb.
-
-union RexLiteral {
-  BooleanLiteral, 
-  I8Literal, I16Literal, I32Literal, I64Literal, 
-  U8Literal, U16Literal, U32Literal, U64Literal,
-  DateLiteral, TimeLiteral, TimestampLiteral,
-  DecimalLiteral,
-  HalfFloatLiteral, FloatLiteral, DoubleLiteral, 
-  ArrayLiteral, StructLiteral, MapLiteral, 
-  StringLiteral, BinaryLiteral}
 
 root_type RexLiteral;

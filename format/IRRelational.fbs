@@ -15,18 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
+include "Schema.fbs";
+include "IRRowExpression.fbs";
+
 namespace org.apache.arrow.ir.flatbuf;
 
-import "Schema.fbs";
-import "IRRowExpression.fbs";
-
-table EmitRemap {
+table Remap {
   output_mapping: [uint32];
 }
 
-table EmitDirect {}
+table Direct {}
 
-union Emit {Remap, Direct}
+union Emit {
+  Remap,
+  Direct,
+}
 
 table RelCommon {
   // describes the emitting rules of the operation.
@@ -36,12 +39,11 @@ table RelCommon {
 }
 
 table Hints {
-  
-  // one or more hints about operations. Can potentially inform 
+  // one or more hints about operations. Can potentially inform
   // operations but should not logically change result.
   hints: [HintKeyValue];
-  
-    // optional information about expected output of relational operation.
+
+  // optional information about expected output of relational operation.
   stats: Stats;
 }
 
@@ -59,6 +61,16 @@ table Stats {
   record_size: double;
 }
 
+// A redistribution algorithm that is best redistribution of data. Similar to round-robin
+// but does not guarantee exact distribution. For example, a batch-by-batch round-robin
+// redistribution would be sufficient even though some targets may receive more information
+// than others.
+table EvenRedistribution {}
+
+union RedistributionMethod {
+  ExpressionRedistribution,
+  EvenRedistribution,
+}
 
 // Operation that redistributes data based on some type of expression
 // the direct emit mapping is equal to the incoming mapping.
@@ -67,45 +79,27 @@ table RedistributeRel {
   redistribution: RedistributionMethod;
 }
 
-// A redistribution method that creates separate streams of data based on an expression.
-table ExpressionRedistribution {
-  // the number of buckets generated
-  bucket_count: int32;
-  
-  // an expression that returns a bucket based on a record.
-  expression: Rex;
-}
-
 // A redistribution method that maintains a set of ordered streams.
 table ExpressionRedistribution {
   // the number of buckets generated
   bucket_count: int32;
-  
+
   // an expression that returns a stream position based on a record.
   distribution_expression: Rex;
-  
+
   //
   sort_fields: [uint32];
 }
 
-// A redistribution algorithm that is best redistribution of data. Similar to round-robin 
-// but does not guarantee exact distribution. For example, a batch-by-batch round-robin 
-// redistribution would be sufficient even though some targets may receive more information 
-// than others.
-table EvenRedistribution {
-}
-
-union RedistributionMethod {ExpressionRedistribution, EvenRedistribution}
-
 table Grouping {
-  field: [Rex]
+  field: [Rex];
 }
 
 // An operation that collects values in one or more groupings.
-// Direct order is: 
-//   grouping_ordinal (if more than one), 
+// Direct order is:
+//   grouping_ordinal (if more than one),
 //   grouping fields (using first appearance in grouping lists),
-//   measures (in order of declaration). 
+//   measures (in order of declaration).
 table AggRel {
   common: RelCommon;
   input: Rel;
@@ -114,15 +108,15 @@ table AggRel {
 }
 
 
-enum CorrelateType {
+enum CorrelateType : byte {
   // Output left and right for each match.
-  REGULAR = 1, 
-  
+  REGULAR,
+
   // Output LEFT for each record that matches at least one record from RIGHT.
-  SEMI = 2, 
-  
+  SEMI,
+
   // Output LEFT for each record that matches zero records from RIGHT.
-  ANTI = 3
+  ANTI,
 }
 
 // An operation that behaves similar to a nested loop join based on a set of comparison columns. Output is based on the type of the left input.
@@ -133,11 +127,14 @@ table CorrelateRel {
   left: Rel;
   right: Rel;
   // the expression that correlates the left and right inputs. Should only be used in cases that cannot be expressed using JoinRel.
-  expression: Rex; 
+  expression: Rex;
 }
 
-enum JoinType {
-  INNER, LEFT, RIGHT, OUTER
+enum JoinType : byte {
+  INNER,
+  LEFT,
+  RIGHT,
+  OUTER,
 }
 
 table JoinRel {
@@ -145,22 +142,22 @@ table JoinRel {
   join_type: JoinType;
   left: Rel;
   right: Rel;
-  
-  // field references are referred to left-first. So if left has three fields 
+
+  // field references are referred to left-first. So if left has three fields
   // and Right has two: 0..2 => left, 3..4 => right
   condition: Rex;
 }
 
-enum SetOpType: byte {
+enum SetOpType : byte {
   // remove all matching inputs 1..N from input 0.
   MINUS,
-  
+
   // include data from all inputs.
-  UNION_ALL, 
+  UNION_ALL,
 
   // Return all records that exist in either set, eliminating duplicates.
   UNION_DISTINCT,
-  
+
   // Include data that exists in all inputs
   INTERSECTION
 }
@@ -168,7 +165,7 @@ enum SetOpType: byte {
 // generic set operations
 // fields are ordered based the same as the input data.
 // output type maps to the fields of initial input.
-// all inputs must have matching schema types.    
+// all inputs must have matching schema types.
 table SetRel {
   inputs: [Rel];
   set_op_type: SetOpType;
@@ -201,23 +198,41 @@ table FilterRel {
 
 table ReadRel {
   common: RelCommon;
+  // TODO(cpcloud): are the configs structured in any way?
   config: [byte];
 }
 
 table LiteralRel {
   common: RelCommon;
+  // TODO(cpcloud): [row1, row2, row3, ..., rowN]
   values: [StructLiteral];
 }
 
 table WriteRel {
   common: RelCommon;
-  schema: 
+  schema: org.apache.arrow.flatbuf.Schema;
   input: Rel;
   config: [byte];
 }
 
 // TODO, Collect, Uncollect, Match, RepeatUnion.
-union Rel {AggRel, SortRel, FetchRel, ProjectRel, FilterRel, WriteRel, ReadRel, JoinRel, RedistributeRel}
+//
+// TODO(cpcloud): do we need custom operators here?
+union RelValue {
+  AggRel,
+  CorrelateRel,
+  SortRel,
+  FetchRel,
+  ProjectRel,
+  FilterRel,
+  WriteRel,
+  ReadRel,
+  JoinRel,
+  RedistributeRel
+}
+
+table Rel {
+  value: RelValue;
+}
 
 root_type Rel;
-

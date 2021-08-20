@@ -15,19 +15,28 @@
 // specific language governing permissions and limitations
 // under the License.
 
+include "Schema.fbs";
+include "IRLiteral.fbs";
+include "IRFunction.fbs";
+
 namespace org.apache.arrow.ir.flatbuf;
 
-import "Schema.fbs";
-import "IRLiteral.fbs";
-import "IRFunctionExpression.fbs";
-
 table RexFunction {
-    id: FunctionId;
-    arguments: [Rex];
+  id: FunctionId;
+  arguments: [Rex];
+}
+
+table RexName {
+  name: string;
 }
 
 // a reference inside a simple or complex structure
-union RexDereferenceElement {RexStructField, RexName, RexArrayItem, RexArraySlice}
+union RexDereferenceElement {
+  RexStructField,
+  RexName,
+  RexArrayItem,
+  RexArraySlice,
+}
 
 table RexMapKey {
   // describes a map key to retrieve
@@ -36,7 +45,7 @@ table RexMapKey {
 
 table RexStructField {
   // ordinal position of field in struct in schema
-    ordinal: int32;
+  ordinal: int32;
 }
 
 table RexArrayPosition {
@@ -47,7 +56,7 @@ table RexArrayPosition {
 table RexArrayItem {
   // returns a single value of the array's inner type.
   // 0-index position of value in array
-  // Note: we use 0-index here despite sql standard 1-index due to this being an 
+  // Note: we use 0-index here despite sql standard 1-index due to this being an
   // lower level construct.
   // if negative, is offset from end instead of beginning.
   position: int64;
@@ -60,48 +69,63 @@ table RexArraySlice {
 }
 
 table RexDereference {
-    positions: [RexDereferenceElement];
+  positions: [RexDereferenceElement];
 }
 
-table BoundPreceding {
+table Preceding {
+  /// TODO(cpcloud): Should this be an expression, to support that use case?
+  ///                e.g., SELECT avg(x) OVER (RANGE BETWEEN num_days PRECEDING AND CURRENT ROW)
   offset: int64;
 }
 
-table BoundFollowing {
+table Following {
   offset: int64;
 }
 
 table CurrentRow {}
 
-
-union Bound {BoundPreceding, BoundFollowing, CurrentRow
-
-
-enum SortType: byte {
-  UNKNOWN = 0,
-  ASC_NULLS_FIRST = 1,
-  ASC_NULLS_LAST = 2,
-  DESC_NULLS_FIRST = 3,
-  DESC_NULLS_LAST = 4,
-  // same values are collected together but their ordering is not guaranteed.
-  CLUSTERED = 5
+union Bound {
+  Preceding,
+  Following,
+  CurrentRow
 }
-    
+
+enum SortType : byte {
+  UNKNOWN,
+  ASC_NULLS_FIRST,
+  ASC_NULLS_LAST,
+  DESC_NULLS_FIRST,
+  DESC_NULLS_LAST,
+  // same values are collected together but their ordering is not guaranteed.
+  CLUSTERED
+}
+
 table SortField {
-    expr: Rex;
-    type: SortType;
-    // TODO: collation
+  expr: Rex;
+  type: SortType;
+  // TODO: collation
 }
 
 table RexWindowFunction {
-    partitions: [Rex];
-    sorts: [SortField];
-    upper_bound: Bound;
-    lower_bound: Bound;
+  // TODO(cpcloud): does this need a FunctionId reference? Does it need
+  // to contain a reference to the thing it's operating on.
+  partitions: [Rex];
+  sorts: [SortField];
+  upper_bound: Bound;
+  lower_bound: Bound;
 }
 
 // TODO: evaluate the inclusion of conditions as first class entities.
 // TODO: evaluate the inclusion of boolean operations as first class entities.
-union Rex {RexLiteral, RexDereference, RexFunction, RexWindowFunction}
+union RexValue {
+  RexLiteral,
+  RexDereference,
+  RexFunction,
+  RexWindowFunction,
+}
+
+table Rex {
+  value: RexValue;
+}
 
 root_type Rex;
