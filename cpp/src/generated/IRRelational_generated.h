@@ -62,6 +62,9 @@ struct JoinRelBuilder;
 struct SetRel;
 struct SetRelBuilder;
 
+struct SetRelAlt;
+struct SetRelAltBuilder;
+
 struct SortRel;
 struct SortRelBuilder;
 
@@ -299,11 +302,13 @@ enum class RelValue : uint8_t {
   ReadRel = 8,
   JoinRel = 9,
   RedistributeRel = 10,
+  SetRel = 11,
+  SetRelAlt = 12,
   MIN = NONE,
-  MAX = RedistributeRel
+  MAX = SetRelAlt
 };
 
-inline const RelValue (&EnumValuesRelValue())[11] {
+inline const RelValue (&EnumValuesRelValue())[13] {
   static const RelValue values[] = {
     RelValue::NONE,
     RelValue::AggRel,
@@ -315,13 +320,15 @@ inline const RelValue (&EnumValuesRelValue())[11] {
     RelValue::WriteRel,
     RelValue::ReadRel,
     RelValue::JoinRel,
-    RelValue::RedistributeRel
+    RelValue::RedistributeRel,
+    RelValue::SetRel,
+    RelValue::SetRelAlt
   };
   return values;
 }
 
 inline const char * const *EnumNamesRelValue() {
-  static const char * const names[12] = {
+  static const char * const names[14] = {
     "NONE",
     "AggRel",
     "CorrelateRel",
@@ -333,13 +340,15 @@ inline const char * const *EnumNamesRelValue() {
     "ReadRel",
     "JoinRel",
     "RedistributeRel",
+    "SetRel",
+    "SetRelAlt",
     nullptr
   };
   return names;
 }
 
 inline const char *EnumNameRelValue(RelValue e) {
-  if (flatbuffers::IsOutRange(e, RelValue::NONE, RelValue::RedistributeRel)) return "";
+  if (flatbuffers::IsOutRange(e, RelValue::NONE, RelValue::SetRelAlt)) return "";
   const size_t index = static_cast<size_t>(e);
   return EnumNamesRelValue()[index];
 }
@@ -386,6 +395,14 @@ template<> struct RelValueTraits<org::apache::arrow::ir::flatbuf::JoinRel> {
 
 template<> struct RelValueTraits<org::apache::arrow::ir::flatbuf::RedistributeRel> {
   static const RelValue enum_value = RelValue::RedistributeRel;
+};
+
+template<> struct RelValueTraits<org::apache::arrow::ir::flatbuf::SetRel> {
+  static const RelValue enum_value = RelValue::SetRel;
+};
+
+template<> struct RelValueTraits<org::apache::arrow::ir::flatbuf::SetRelAlt> {
+  static const RelValue enum_value = RelValue::SetRelAlt;
 };
 
 bool VerifyRelValue(flatbuffers::Verifier &verifier, const void *obj, RelValue type);
@@ -1347,6 +1364,70 @@ inline flatbuffers::Offset<SetRel> CreateSetRelDirect(
       set_op_type);
 }
 
+struct SetRelAlt FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
+  typedef SetRelAltBuilder Builder;
+  enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
+    VT_LEFT = 4,
+    VT_RIGHT = 6,
+    VT_SET_OP_TYPE = 8
+  };
+  const org::apache::arrow::ir::flatbuf::Rel *left() const {
+    return GetPointer<const org::apache::arrow::ir::flatbuf::Rel *>(VT_LEFT);
+  }
+  const org::apache::arrow::ir::flatbuf::Rel *right() const {
+    return GetPointer<const org::apache::arrow::ir::flatbuf::Rel *>(VT_RIGHT);
+  }
+  org::apache::arrow::ir::flatbuf::SetOpType set_op_type() const {
+    return static_cast<org::apache::arrow::ir::flatbuf::SetOpType>(GetField<int8_t>(VT_SET_OP_TYPE, 0));
+  }
+  bool Verify(flatbuffers::Verifier &verifier) const {
+    return VerifyTableStart(verifier) &&
+           VerifyOffset(verifier, VT_LEFT) &&
+           verifier.VerifyTable(left()) &&
+           VerifyOffset(verifier, VT_RIGHT) &&
+           verifier.VerifyTable(right()) &&
+           VerifyField<int8_t>(verifier, VT_SET_OP_TYPE) &&
+           verifier.EndTable();
+  }
+};
+
+struct SetRelAltBuilder {
+  typedef SetRelAlt Table;
+  flatbuffers::FlatBufferBuilder &fbb_;
+  flatbuffers::uoffset_t start_;
+  void add_left(flatbuffers::Offset<org::apache::arrow::ir::flatbuf::Rel> left) {
+    fbb_.AddOffset(SetRelAlt::VT_LEFT, left);
+  }
+  void add_right(flatbuffers::Offset<org::apache::arrow::ir::flatbuf::Rel> right) {
+    fbb_.AddOffset(SetRelAlt::VT_RIGHT, right);
+  }
+  void add_set_op_type(org::apache::arrow::ir::flatbuf::SetOpType set_op_type) {
+    fbb_.AddElement<int8_t>(SetRelAlt::VT_SET_OP_TYPE, static_cast<int8_t>(set_op_type), 0);
+  }
+  explicit SetRelAltBuilder(flatbuffers::FlatBufferBuilder &_fbb)
+        : fbb_(_fbb) {
+    start_ = fbb_.StartTable();
+  }
+  SetRelAltBuilder &operator=(const SetRelAltBuilder &);
+  flatbuffers::Offset<SetRelAlt> Finish() {
+    const auto end = fbb_.EndTable(start_);
+    auto o = flatbuffers::Offset<SetRelAlt>(end);
+    return o;
+  }
+};
+
+inline flatbuffers::Offset<SetRelAlt> CreateSetRelAlt(
+    flatbuffers::FlatBufferBuilder &_fbb,
+    flatbuffers::Offset<org::apache::arrow::ir::flatbuf::Rel> left = 0,
+    flatbuffers::Offset<org::apache::arrow::ir::flatbuf::Rel> right = 0,
+    org::apache::arrow::ir::flatbuf::SetOpType set_op_type = org::apache::arrow::ir::flatbuf::SetOpType::MINUS) {
+  SetRelAltBuilder builder_(_fbb);
+  builder_.add_right(right);
+  builder_.add_left(left);
+  builder_.add_set_op_type(set_op_type);
+  return builder_.Finish();
+}
+
 struct SortRel FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef SortRelBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
@@ -1718,8 +1799,8 @@ struct LiteralRel FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const org::apache::arrow::ir::flatbuf::RelCommon *common() const {
     return GetPointer<const org::apache::arrow::ir::flatbuf::RelCommon *>(VT_COMMON);
   }
-  const flatbuffers::Vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RexLiteral>> *values() const {
-    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RexLiteral>> *>(VT_VALUES);
+  const flatbuffers::Vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::StructLiteral>> *values() const {
+    return GetPointer<const flatbuffers::Vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::StructLiteral>> *>(VT_VALUES);
   }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
@@ -1739,7 +1820,7 @@ struct LiteralRelBuilder {
   void add_common(flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RelCommon> common) {
     fbb_.AddOffset(LiteralRel::VT_COMMON, common);
   }
-  void add_values(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RexLiteral>>> values) {
+  void add_values(flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::StructLiteral>>> values) {
     fbb_.AddOffset(LiteralRel::VT_VALUES, values);
   }
   explicit LiteralRelBuilder(flatbuffers::FlatBufferBuilder &_fbb)
@@ -1757,7 +1838,7 @@ struct LiteralRelBuilder {
 inline flatbuffers::Offset<LiteralRel> CreateLiteralRel(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RelCommon> common = 0,
-    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RexLiteral>>> values = 0) {
+    flatbuffers::Offset<flatbuffers::Vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::StructLiteral>>> values = 0) {
   LiteralRelBuilder builder_(_fbb);
   builder_.add_values(values);
   builder_.add_common(common);
@@ -1767,8 +1848,8 @@ inline flatbuffers::Offset<LiteralRel> CreateLiteralRel(
 inline flatbuffers::Offset<LiteralRel> CreateLiteralRelDirect(
     flatbuffers::FlatBufferBuilder &_fbb,
     flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RelCommon> common = 0,
-    const std::vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RexLiteral>> *values = nullptr) {
-  auto values__ = values ? _fbb.CreateVector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::RexLiteral>>(*values) : 0;
+    const std::vector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::StructLiteral>> *values = nullptr) {
+  auto values__ = values ? _fbb.CreateVector<flatbuffers::Offset<org::apache::arrow::ir::flatbuf::StructLiteral>>(*values) : 0;
   return org::apache::arrow::ir::flatbuf::CreateLiteralRel(
       _fbb,
       common,
@@ -1909,6 +1990,12 @@ struct Rel FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   const org::apache::arrow::ir::flatbuf::RedistributeRel *value_as_RedistributeRel() const {
     return value_type() == org::apache::arrow::ir::flatbuf::RelValue::RedistributeRel ? static_cast<const org::apache::arrow::ir::flatbuf::RedistributeRel *>(value()) : nullptr;
   }
+  const org::apache::arrow::ir::flatbuf::SetRel *value_as_SetRel() const {
+    return value_type() == org::apache::arrow::ir::flatbuf::RelValue::SetRel ? static_cast<const org::apache::arrow::ir::flatbuf::SetRel *>(value()) : nullptr;
+  }
+  const org::apache::arrow::ir::flatbuf::SetRelAlt *value_as_SetRelAlt() const {
+    return value_type() == org::apache::arrow::ir::flatbuf::RelValue::SetRelAlt ? static_cast<const org::apache::arrow::ir::flatbuf::SetRelAlt *>(value()) : nullptr;
+  }
   bool Verify(flatbuffers::Verifier &verifier) const {
     return VerifyTableStart(verifier) &&
            VerifyField<uint8_t>(verifier, VT_VALUE_TYPE) &&
@@ -1956,6 +2043,14 @@ template<> inline const org::apache::arrow::ir::flatbuf::JoinRel *Rel::value_as<
 
 template<> inline const org::apache::arrow::ir::flatbuf::RedistributeRel *Rel::value_as<org::apache::arrow::ir::flatbuf::RedistributeRel>() const {
   return value_as_RedistributeRel();
+}
+
+template<> inline const org::apache::arrow::ir::flatbuf::SetRel *Rel::value_as<org::apache::arrow::ir::flatbuf::SetRel>() const {
+  return value_as_SetRel();
+}
+
+template<> inline const org::apache::arrow::ir::flatbuf::SetRelAlt *Rel::value_as<org::apache::arrow::ir::flatbuf::SetRelAlt>() const {
+  return value_as_SetRelAlt();
 }
 
 struct RelBuilder {
@@ -2091,6 +2186,14 @@ inline bool VerifyRelValue(flatbuffers::Verifier &verifier, const void *obj, Rel
     }
     case RelValue::RedistributeRel: {
       auto ptr = reinterpret_cast<const org::apache::arrow::ir::flatbuf::RedistributeRel *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case RelValue::SetRel: {
+      auto ptr = reinterpret_cast<const org::apache::arrow::ir::flatbuf::SetRel *>(obj);
+      return verifier.VerifyTable(ptr);
+    }
+    case RelValue::SetRelAlt: {
+      auto ptr = reinterpret_cast<const org::apache::arrow::ir::flatbuf::SetRelAlt *>(obj);
       return verifier.VerifyTable(ptr);
     }
     default: return true;

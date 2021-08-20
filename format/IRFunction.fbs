@@ -46,6 +46,7 @@ union OutputDerivation {DirectOutputType, ComplexOutputType}
 
 /// TODO(cpcloud): why is this not a single `type` field?
 ///                is this an array of *possible* types that an argument could be?
+/// TODO(cpcloud): At what point does monomorphization occur?
 table DirectArgument {
   // An Arrow datatype. Note that this type can incompletely formed to match a
   // subset of types.  This is the one place a type can be incompletely formed.
@@ -55,8 +56,7 @@ table DirectArgument {
 }
 
 
-/// TODO(cpcloud)
-/// Is this a convenience, or something that supports a particular use case?
+/// TODO(cpcloud):  Is this to support variadic functions?
 ///
 // Argument that supports [minimum_count..maximum_count] arguments of this
 // type. A WildCardArgument must always be declared last.
@@ -78,5 +78,9 @@ table FunctionSignature {
   arguments: [Argument];
   output: OutputDerivation;
 }
+
+
+/// TODO(cpcloud): is it the concern of the consumer
+/// to deal with function registries and lookups?
 
 root_type FunctionSignature;

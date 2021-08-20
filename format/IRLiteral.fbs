@@ -15,6 +15,21 @@
 // specific language governing permissions and limitations
 // under the License.
 
+
+/// TODO(cpcloud): this all looks reasonable to me
+/// the main distinction is that #10934
+/// uses a byte blob of arrow data to
+/// store literals
+
+/// I could see an argument for either.
+
+/// On the one hand, literals aren't usually the source of overhead
+/// though c.f., JSON strings of wildly varying sizes that people tend to
+/// pass around, so defining them locally to the IR makes for
+/// easier understanding and much less indirection.
+///
+/// On the other, code reuse maybe? Maybe that's shoehorning it in unnecessarily.
+
 include "Schema.fbs";
 include "IRFunction.fbs";
 

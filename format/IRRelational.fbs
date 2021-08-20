@@ -20,6 +20,7 @@ include "IRRowExpression.fbs";
 
 namespace org.apache.arrow.ir.flatbuf;
 
+// TODO(cpcloud): understand what these are for
 table Remap {
   output_mapping: [uint32];
 }
@@ -65,6 +66,9 @@ table Stats {
 // but does not guarantee exact distribution. For example, a batch-by-batch round-robin
 // redistribution would be sufficient even though some targets may receive more information
 // than others.
+//
+// TODO(cpcloud): Can this be expressed (reasonably easily) as an
+// ExpressionRedistribution? thereby collapsing this to a single type
 table EvenRedistribution {}
 
 union RedistributionMethod {
@@ -171,6 +175,14 @@ table SetRel {
   set_op_type: SetOpType;
 }
 
+// TODO(cpcloud): alternative representation since
+// we have the RelValue union type
+table SetRelAlt {
+  left: Rel;
+  right: Rel;
+  set_op_type: SetOpType;
+}
+
 table SortRel {
   common: RelCommon;
   input: Rel;
@@ -204,10 +216,14 @@ table ReadRel {
 
 table LiteralRel {
   common: RelCommon;
-  // TODO(cpcloud): [row1, row2, row3, ..., rowN]
+  // TODO(cpcloud): this is just my own notes clarifying why this is a list of structs
+  // [row1, row2, row3, ..., rowN]
+  // appears to map to SQL's VALUES construct
   values: [StructLiteral];
 }
 
+// TODO(cpcloud): *WriteRel* is the only thing with a schema?
+// TODO(cpcloud): how does a producer get back results from a consumer (possibly out of scope)
 table WriteRel {
   common: RelCommon;
   schema: org.apache.arrow.flatbuf.Schema;
@@ -215,9 +231,14 @@ table WriteRel {
   config: [byte];
 }
 
-// TODO, Collect, Uncollect, Match, RepeatUnion.
-//
+// TODO(cpcloud): how would UNNEST/EXPLODE fit in here? Or is that actually a function?
+// Seems like a special case, since it's a function that takes a scalar input and
+// produces a relation (I guess sequences in postgres behave this way as well)
+// but maybe there's an obvious model here and I just don't know enough
+
 // TODO(cpcloud): do we need custom operators here?
+//
+// TODO, Collect, Uncollect, Match, RepeatUnion.
 union RelValue {
   AggRel,
   CorrelateRel,
@@ -228,7 +249,9 @@ union RelValue {
   WriteRel,
   ReadRel,
   JoinRel,
-  RedistributeRel
+  RedistributeRel,
+  SetRel,
+  SetRelAlt,
 }
 
 table Rel {

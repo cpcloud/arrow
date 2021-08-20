@@ -413,6 +413,7 @@ inline flatbuffers::Offset<ComplexOutputType> CreateComplexOutputType(
 
 /// TODO(cpcloud): why is this not a single `type` field?
 ///                is this an array of *possible* types that an argument could be?
+/// TODO(cpcloud): At what point does monomorphization occur?
 struct DirectArgument FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef DirectArgumentBuilder Builder;
   enum FlatBuffersVTableOffset FLATBUFFERS_VTABLE_UNDERLYING_TYPE {
@@ -480,8 +481,7 @@ inline flatbuffers::Offset<DirectArgument> CreateDirectArgumentDirect(
       types__);
 }
 
-/// TODO(cpcloud)
-/// Is this a convenience, or something that supports a particular use case?
+/// TODO(cpcloud):  Is this to support variadic functions?
 ///
 struct WildcardArgument FLATBUFFERS_FINAL_CLASS : private flatbuffers::Table {
   typedef WildcardArgumentBuilder Builder;

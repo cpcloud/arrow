@@ -21,6 +21,9 @@ include "IRFunction.fbs";
 
 namespace org.apache.arrow.ir.flatbuf;
 
+
+// TODO(cpcloud): where the types of the non-function Rexn denoted?
+
 table RexFunction {
   id: FunctionId;
   arguments: [Rex];
@@ -48,6 +51,7 @@ table RexStructField {
   ordinal: int32;
 }
 
+// TODO(cpcloud): is this necessary given `RexArrayItem`
 table RexArrayPosition {
   // starting from 1 position of value in array (per sql standard)
   position: int32;
@@ -104,6 +108,7 @@ table SortField {
   expr: Rex;
   type: SortType;
   // TODO: collation
+  // TODO(cpcloud): ah, collation is basicially Rust's PartialOrd trait
 }
 
 table RexWindowFunction {
